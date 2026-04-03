@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Nova Empresa</h2>
+<form method="POST">
+    <div class="mb-3"><label>Nome</label><input type="text" name="nome" class="form-control" required></div>
+    <div class="mb-3"><label>CNPJ</label><input type="text" name="cnpj" class="form-control" required></div>
+    <div class="mb-3"><label>CEP</label><input type="text" name="cep" id="cep" class="form-control" onblur="buscarCep()"></div>
+    <div class="mb-3"><label>Rua</label><input type="text" name="rua" id="rua" class="form-control" readonly></div>
+    <div class="mb-3"><label>Bairro</label><input type="text" name="bairro" id="bairro" class="form-control" readonly></div>
+    <div class="mb-3"><label>Cidade</label><input type="text" name="cidade" id="cidade" class="form-control" readonly></div>
+    <div class="mb-3"><label>Estado</label><input type="text" name="estado" id="estado" class="form-control" readonly></div>
+    <button type="submit" class="btn btn-primary">Salvar</button>
+    <a href="{{ url_for('list_empresas') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+<script>
+function buscarCep() {
+    let cep = document.getElementById('cep').value.replace(/\D/g,'');
+    if(cep.length != 8) return;
+    fetch(`https://viacep.com.br/ws/${cep}/json/`)
+        .then(r => r.json())
+        .then(data => {
+            if(!data.erro){
+                document.getElementById('rua').value = data.logradouro || '';
+                document.getElementById('bairro').value = data.bairro || '';
+                document.getElementById('cidade').value = data.localidade || '';
+                document.getElementById('estado').value = data.uf || '';
+            }
+        });
+}
+</script>
+{% endblock %}

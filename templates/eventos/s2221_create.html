@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Novo Evento S-2221</h2>
+<form method="POST">
+    <div class="mb-3"><label>Funcionário</label><select name="funcionario_id" class="form-select" required>
+        <option value="">Selecione</option>
+        {% for f in funcionarios %}
+        <option value="{{ f.id }}">{{ f.nome }} ({{ f.cpf }})</option>
+        {% endfor %}
+    </select></div>
+    <div class="mb-3"><label>Data do Exame</label><input type="date" name="data_exame" class="form-control" required></div>
+    <div class="mb-3"><label>Tipo de Exame</label><input type="text" name="tipo_exame" class="form-control" required></div>
+    <div class="mb-3"><label>Resultado</label><textarea name="resultado" class="form-control" rows="3" required></textarea></div>
+    <div class="mb-3"><label>Laboratório</label><input type="text" name="laboratorio" class="form-control"></div>
+    <button type="submit" class="btn btn-primary">Salvar</button>
+    <a href="{{ url_for('list_s2221') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

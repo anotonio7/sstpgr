@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Novo Evento S-2210 (CAT)</h2>
+<form method="POST">
+    <div class="mb-3"><label>Funcionário</label><select name="funcionario_id" class="form-select" required>
+        <option value="">Selecione</option>
+        {% for f in funcionarios %}
+        <option value="{{ f.id }}">{{ f.nome }} ({{ f.cpf }})</option>
+        {% endfor %}
+    </select></div>
+    <div class="mb-3"><label>Data do Acidente</label><input type="date" name="data_acidente" class="form-control" required></div>
+    <div class="mb-3"><label>Tipo de Acidente</label><input type="text" name="tipo_acidente" class="form-control" required placeholder="típico / trajeto / doença"></div>
+    <div class="mb-3"><label>Local</label><input type="text" name="local" class="form-control"></div>
+    <div class="mb-3"><label>Parte Atingida</label><input type="text" name="parte_atingida" class="form-control"></div>
+    <div class="mb-3"><label>Descrição</label><textarea name="descricao" class="form-control" rows="3" required></textarea></div>
+    <button type="submit" class="btn btn-primary">Salvar</button>
+    <a href="{{ url_for('list_s2210') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

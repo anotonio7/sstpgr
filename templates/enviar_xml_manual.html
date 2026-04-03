@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Envio Manual de XML para o eSocial</h2>
+    <p>Selecione um arquivo XML (não assinado) para enviar. O sistema usará o certificado configurado para assinar e enviar.</p>
+
+    <form method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="xml_file" class="form-label">Arquivo XML</label>
+            <input type="file" class="form-control" id="xml_file" name="xml_file" accept=".xml" required>
+            <div class="form-text">O XML deve estar no formato do eSocial (ex: evento S-2220, S-2210, etc.).</div>
+        </div>
+        <button type="submit" class="btn btn-primary">Enviar</button>
+        <a href="{{ url_for('list_s2220') }}" class="btn btn-secondary">Cancelar</a>
+    </form>
+
+    <hr>
+    <div class="alert alert-warning">
+        <strong>Atenção:</strong> O XML será assinado com o certificado que você configurou. Certifique-se de que o evento no XML corresponde ao ambiente (homologação/produção) selecionado na configuração.
+    </div>
+</div>
+{% endblock %}

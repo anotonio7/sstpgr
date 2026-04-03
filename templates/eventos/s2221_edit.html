@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Editar Evento S-2221</h2>
+<form method="POST">
+    <div class="mb-3"><label>Funcionário</label><select name="funcionario_id" class="form-select" required>
+        {% for f in funcionarios %}
+        <option value="{{ f.id }}" {% if f.id == evento.funcionario_id %}selected{% endif %}>{{ f.nome }} ({{ f.cpf }})</option>
+        {% endfor %}
+    </select></div>
+    <div class="mb-3"><label>Data do Exame</label><input type="date" name="data_exame" value="{{ evento.data_exame.strftime('%Y-%m-%d') }}" class="form-control" required></div>
+    <div class="mb-3"><label>Tipo de Exame</label><input type="text" name="tipo_exame" value="{{ evento.tipo_exame }}" class="form-control" required></div>
+    <div class="mb-3"><label>Resultado</label><textarea name="resultado" class="form-control" rows="3" required>{{ evento.resultado }}</textarea></div>
+    <div class="mb-3"><label>Laboratório</label><input type="text" name="laboratorio" value="{{ evento.laboratorio or '' }}" class="form-control"></div>
+    <button type="submit" class="btn btn-primary">Atualizar</button>
+    <a href="{{ url_for('list_s2221') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

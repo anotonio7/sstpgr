@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Editar Empresa</h2>
+<form method="POST">
+    <div class="mb-3"><label>Nome</label><input type="text" name="nome" class="form-control" value="{{ e.nome }}" required></div>
+    <div class="mb-3"><label>CNPJ</label><input type="text" name="cnpj" class="form-control" value="{{ e.cnpj }}" required></div>
+    <div class="mb-3"><label>CEP</label><input type="text" name="cep" id="cep" class="form-control" value="{{ e.cep }}" onblur="buscarCep()"></div>
+    <div class="mb-3"><label>Rua</label><input type="text" name="rua" id="rua" class="form-control" value="{{ e.rua }}" readonly></div>
+    <div class="mb-3"><label>Bairro</label><input type="text" name="bairro" id="bairro" class="form-control" value="{{ e.bairro }}" readonly></div>
+    <div class="mb-3"><label>Cidade</label><input type="text" name="cidade" id="cidade" class="form-control" value="{{ e.cidade }}" readonly></div>
+    <div class="mb-3"><label>Estado</label><input type="text" name="estado" id="estado" class="form-control" value="{{ e.estado }}" readonly></div>
+    <button type="submit" class="btn btn-primary">Atualizar</button>
+    <a href="{{ url_for('list_empresas') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+<script>/* mesma função de CEP */</script>
+{% endblock %}

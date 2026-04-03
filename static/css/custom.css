@@ -1,0 +1,27 @@
+/* Cores personalizadas para os cards do dashboard */
+.card-custom-blue {
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    color: white;
+}
+.card-custom-green {
+    background: linear-gradient(135deg, #0f5c3b, #1e7e34);
+    color: white;
+}
+.card-custom-info {
+    background: linear-gradient(135deg, #0c5460, #17a2b8);
+    color: white;
+}
+.card-custom-warning {
+    background: linear-gradient(135deg, #d39e00, #ffc107);
+    color: white;
+}
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+}
+.card-header {
+    background-color: #343a40;
+    color: white;
+    font-weight: bold;
+}

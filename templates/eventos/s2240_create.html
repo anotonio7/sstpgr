@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Novo Evento S-2240</h2>
+<form method="POST">
+    <div class="mb-3"><label>Funcionário</label><select name="funcionario_id" class="form-select" required>
+        <option value="">Selecione</option>
+        {% for f in funcionarios %}
+        <option value="{{ f.id }}">{{ f.nome }} ({{ f.cpf }})</option>
+        {% endfor %}
+    </select></div>
+    <div class="mb-3"><label>Data da Avaliação</label><input type="date" name="data_avaliacao" class="form-control" required></div>
+    <div class="mb-3"><label>Agente de Risco</label><input type="text" name="agente_risco" class="form-control" required></div>
+    <div class="mb-3"><label>Intensidade</label><input type="text" name="intensidade" class="form-control"></div>
+    <div class="mb-3"><label>EPI Utilizado</label><input type="text" name="epi_utilizado" class="form-control"></div>
+    <button type="submit" class="btn btn-primary">Salvar</button>
+    <a href="{{ url_for('list_s2240') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

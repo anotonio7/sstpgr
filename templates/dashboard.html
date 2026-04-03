@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-md-3 mb-4">
+        <div class="card card-custom-blue">
+            <div class="card-body">
+                <h5>Empresas</h5>
+                <p class="display-4">{{ empresas }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-4">
+        <div class="card card-custom-green">
+            <div class="card-body">
+                <h5>Funcionários</h5>
+                <p class="display-4">{{ funcionarios }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-4">
+        <div class="card card-custom-info">
+            <div class="card-body">
+                <h5>S-2220</h5>
+                <p class="display-4">{{ s2220 }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-4">
+        <div class="card card-custom-warning">
+            <div class="card-body">
+                <h5>S-2221</h5>
+                <p class="display-4">{{ s2221 }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Últimas Empresas</div>
+            <div class="card-body">
+                <ul>
+                    {% for e in empresas_lista %}
+                        <li>{{ e.nome }} - {{ e.cnpj }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Últimos Funcionários</div>
+            <div class="card-body">
+                <ul>
+                    {% for f in funcionarios_lista %}
+                        <li>{{ f.nome }} - {{ f.cpf }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

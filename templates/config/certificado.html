@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Configuração do Certificado Digital</h2>
+<form method="POST" enctype="multipart/form-data">
+    <div class="mb-3">
+        <label>Arquivo PFX (certificado A1)</label>
+        <input type="file" name="certificado" class="form-control" {% if not cfg %}required{% endif %}>
+        {% if cfg %}<small class="text-muted">Atual: {{ cfg.certificado_pfx.split('/')[-1] }}</small>{% endif %}
+    </div>
+    <div class="mb-3">
+        <label>Senha do Certificado</label>
+        <input type="password" name="senha" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label>Ambiente</label>
+        <select name="ambiente" class="form-select" required>
+            <option value="2" {% if cfg and cfg.ambiente == '2' %}selected{% endif %}>Homologação</option>
+            <option value="1" {% if cfg and cfg.ambiente == '1' %}selected{% endif %}>Produção</option>
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Salvar Configuração</button>
+</form>
+{% endblock %}

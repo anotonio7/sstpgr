@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4>Novo Exame</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="funcionario_id" class="form-label">Funcionário</label>
+                        <select class="form-select" id="funcionario_id" name="funcionario_id" required>
+                            <option value="">Selecione...</option>
+                            {% for func in funcionarios %}
+                            <option value="{{ func.id }}">{{ func.nome }} ({{ func.cpf }}) - {{ func.empresa.nome if func.empresa else '' }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tipo" class="form-label">Tipo de Exame</label>
+                        <input type="text" class="form-control" id="tipo" name="tipo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="data" class="form-label">Data do Exame</label>
+                        <input type="date" class="form-control" id="data" name="data" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancelar</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

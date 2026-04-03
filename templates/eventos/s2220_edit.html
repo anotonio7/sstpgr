@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Editar Evento S-2220</h2>
+<form method="POST">
+    <div class="mb-3">
+        <label for="funcionario_id" class="form-label">Funcionário</label>
+        <select name="funcionario_id" class="form-select" required>
+            {% for f in funcionarios %}
+            <option value="{{ f.id }}" {% if f.id == evento.funcionario_id %}selected{% endif %}>{{ f.nome }} ({{ f.cpf }})</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="data_aso" class="form-label">Data do ASO</label>
+        <input type="date" name="data_aso" value="{{ evento.data_aso.strftime('%Y-%m-%d') if evento.data_aso else '' }}" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label for="crm_medico" class="form-label">CRM Médico</label>
+        <input type="text" name="crm_medico" value="{{ evento.crm_medico }}" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label for="uf_crm" class="form-label">UF do CRM</label>
+        <input type="text" name="uf_crm" value="{{ evento.uf_crm }}" class="form-control" maxlength="2" required>
+    </div>
+
+    <hr>
+    <h4>Exames Realizados</h4>
+    <div class="table-responsive">
+        <table class="table table-bordered" id="tabela_exames">
+            <thead>
+                <tr>
+                    <th>Data do Exame</th>
+                    <th>Tipo de Exame</th>
+                    <th>Resultado</th>
+                    <th style="width: 80px;">Ação</th>
+                </tr>
+            </thead>
+            <tbody id="corpo_exames">
+                {% for ex in evento.exames %}
+                <tr class="linha-exame">
+                    <td><input type="date" name="data_exame[]" value="{{ ex.data_exame.strftime('%Y-%m-%d') }}" class="form-control" required></td>
+                    <td>
+                        <input list="tiposExame" name="tipo_exame[]" value="{{ ex.tipo_exame }}" class="form-control" required>
+                    </td>
+                    <td><textarea name="resultado[]" class="form-control" rows="2" required>{{ ex.resultado }}</textarea></td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-danger remover-linha">–</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <button type="button" id="adicionar_linha" class="btn btn-sm btn-primary mb-3">+ Adicionar outro exame</button>
+
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary">Atualizar</button>
+        <a href="{{ url_for('list_s2220') }}" class="btn btn-secondary">Cancelar</a>
+    </div>
+
+    <!-- Datalist com os tipos de exame mais comuns -->
+    <datalist id="tiposExame">
+        <option value="Hemograma completo">
+        <option value="Urina tipo I">
+        <option value="Glicemia em jejum">
+        <option value="Colesterol total">
+        <option value="Triglicerídeos">
+        <option value="Creatinina">
+        <option value="TGO/TGP">
+        <option value="Eletrocardiograma">
+        <option value="Raio-X de tórax">
+        <option value="Audiometria">
+        <option value="Espirometria">
+        <option value="Acuidade visual">
+        <option value="Glicemia pós-prandial">
+        <option value="Hemoglobina glicada">
+        <option value="Ácido úrico">
+        <option value="Parasitológico de fezes">
+        <option value="Beta-hCG (para gestantes)">
+        <option value="Sorologia para hepatite B/C">
+        <option value="Sorologia para HIV">
+        <option value="Outro">
+    </datalist>
+</form>
+
+<script>
+    document.getElementById('adicionar_linha').addEventListener('click', function() {
+        const tbody = document.getElementById('corpo_exames');
+        const novaLinha = document.createElement('tr');
+        novaLinha.className = 'linha-exame';
+        novaLinha.innerHTML = `
+            <td><input type="date" name="data_exame[]" class="form-control" required></td>
+            <td>
+                <input list="tiposExame" name="tipo_exame[]" class="form-control" required>
+            </td>
+            <td><textarea name="resultado[]" class="form-control" rows="2" required></textarea></td>
+            <td class="text-center"><button type="button" class="btn btn-sm btn-danger remover-linha">–</button></td>
+        `;
+        tbody.appendChild(novaLinha);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remover-linha')) {
+            const linha = e.target.closest('tr');
+            if (document.querySelectorAll('.linha-exame').length > 1) {
+                linha.remove();
+            } else {
+                alert('Deve haver pelo menos um exame.');
+            }
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Configuração do Certificado Digital</h2>
+    <p>Configure o certificado A1 (formato PFX) para envio dos eventos ao eSocial.</p>
+
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('config_cert') }}">
+        <div class="mb-3">
+            <label for="cert_file" class="form-label">Arquivo PFX (certificado A1)</label>
+            <input type="file" class="form-control" id="cert_file" name="cert_file" accept=".pfx,.p12" required>
+            <div class="form-text">Selecione o arquivo do certificado digital (formato .pfx ou .p12).</div>
+        </div>
+
+        <div class="mb-3">
+            <label for="senha" class="form-label">Senha do Certificado</label>
+            <input type="password" class="form-control" id="senha" name="senha" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="ambiente" class="form-label">Ambiente</label>
+            <select class="form-select" id="ambiente" name="ambiente">
+                <option value="2">Homologação (testes)</option>
+                <option value="1">Produção</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Salvar Configuração</button>
+        <a href="{{ url_for('list_s2220') }}" class="btn btn-secondary">Cancelar</a>
+    </form>
+
+    <hr>
+    <div class="alert alert-info mt-3">
+        <strong>Importante:</strong> O certificado será armazenado apenas durante a sessão (até o navegador ser fechado). Para produção, considere armazenar em variáveis de ambiente.
+    </div>
+</div>
+{% endblock %}

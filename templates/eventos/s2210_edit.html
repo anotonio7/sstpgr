@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Editar Evento S-2210 (CAT)</h2>
+<form method="POST">
+    <div class="mb-3"><label>Funcionário</label><select name="funcionario_id" class="form-select" required>
+        {% for f in funcionarios %}
+        <option value="{{ f.id }}" {% if f.id == evento.funcionario_id %}selected{% endif %}>{{ f.nome }} ({{ f.cpf }})</option>
+        {% endfor %}
+    </select></div>
+    <div class="mb-3"><label>Data do Acidente</label><input type="date" name="data_acidente" value="{{ evento.data_acidente.strftime('%Y-%m-%d') }}" class="form-control" required></div>
+    <div class="mb-3"><label>Tipo de Acidente</label><input type="text" name="tipo_acidente" value="{{ evento.tipo_acidente }}" class="form-control" required></div>
+    <div class="mb-3"><label>Local</label><input type="text" name="local" value="{{ evento.local or '' }}" class="form-control"></div>
+    <div class="mb-3"><label>Parte Atingida</label><input type="text" name="parte_atingida" value="{{ evento.parte_atingida or '' }}" class="form-control"></div>
+    <div class="mb-3"><label>Descrição</label><textarea name="descricao" class="form-control" rows="3" required>{{ evento.descricao }}</textarea></div>
+    <button type="submit" class="btn btn-primary">Atualizar</button>
+    <a href="{{ url_for('list_s2210') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

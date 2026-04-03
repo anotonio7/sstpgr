@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Funcionários</h2>
+<a href="{{ url_for('create_funcionario') }}" class="btn btn-primary mb-3">Novo Funcionário</a>
+<table class="table table-striped">
+    <thead>
+        <tr><th>ID</th><th>Nome</th><th>CPF</th><th>Matrícula eSocial</th><th>Empresa</th><th>Ações</th></tr>
+    </thead>
+    <tbody>
+        {% for f in funcionarios %}
+        <tr>
+            <td>{{ f.id }}</td>
+            <td>{{ f.nome }}</td>
+            <td>{{ f.cpf }}</td>
+            <td>{{ f.matricula_esocial or '-' }}</td>
+            <td>{{ f.empresa.nome if f.empresa else '-' }}</td>
+            <td>
+                <a href="{{ url_for('edit_funcionario', id=f.id) }}" class="btn btn-sm btn-warning">Editar</a>
+                <a href="{{ url_for('delete_funcionario', id=f.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza?')">Excluir</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
