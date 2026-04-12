@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Painel do Cliente</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h5>Bem-vindo, {{ current_user.nome }}!</h5>
+                    <p>Email: {{ current_user.email }}</p>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-md-3">
+                        <div class="card text-white bg-info mb-3 card-stats">
+                            <div class="card-body">
+                                <h5 class="card-title">Empresas</h5>
+                                <h2>{{ empresas }}</h2>
+                                <a href="{{ url_for('list_empresas') }}" class="btn btn-light btn-sm">Ver</a>
+                                <a href="{{ url_for('create_empresa') }}" class="btn btn-outline-light btn-sm">Novo</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-white bg-success mb-3 card-stats">
+                            <div class="card-body">
+                                <h5 class="card-title">Funcionários</h5>
+                                <h2>{{ funcionarios }}</h2>
+                                <a href="{{ url_for('list_funcionarios') }}" class="btn btn-light btn-sm">Ver</a>
+                                <a href="{{ url_for('create_funcionario_form') }}" class="btn btn-outline-light btn-sm">Novo</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-white bg-warning mb-3 card-stats">
+                            <div class="card-body">
+                                <h5 class="card-title">S-2220 (ASO)</h5>
+                                <h2>{{ s2220 }}</h2>
+                                <a href="{{ url_for('list_s2220') }}" class="btn btn-light btn-sm">Ver</a>
+                                <a href="{{ url_for('create_s2220') }}" class="btn btn-outline-light btn-sm">Novo</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-white bg-danger mb-3 card-stats">
+                            <div class="card-body">
+                                <h5 class="card-title">S-2240 (Riscos)</h5>
+                                <h2>{{ s2240 }}</h2>
+                                <a href="{{ url_for('list_s2240') }}" class="btn btn-light btn-sm">Ver</a>
+                                <a href="{{ url_for('create_s2240') }}" class="btn btn-outline-light btn-sm">Novo</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,31 +1,251 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Nova Empresa</h2>
-<form method="POST">
-    <div class="mb-3"><label>Nome</label><input type="text" name="nome" class="form-control" required></div>
-    <div class="mb-3"><label>CNPJ</label><input type="text" name="cnpj" class="form-control" required></div>
-    <div class="mb-3"><label>CEP</label><input type="text" name="cep" id="cep" class="form-control" onblur="buscarCep()"></div>
-    <div class="mb-3"><label>Rua</label><input type="text" name="rua" id="rua" class="form-control" readonly></div>
-    <div class="mb-3"><label>Bairro</label><input type="text" name="bairro" id="bairro" class="form-control" readonly></div>
-    <div class="mb-3"><label>Cidade</label><input type="text" name="cidade" id="cidade" class="form-control" readonly></div>
-    <div class="mb-3"><label>Estado</label><input type="text" name="estado" id="estado" class="form-control" readonly></div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<form method="POST" id="formEmpresa">
+    <div class="mb-3">
+        <label>Nome *</label>
+        <input type="text" name="nome" id="nome" class="form-control" required>
+        <div class="invalid-feedback">Nome da empresa é obrigatório</div>
+    </div>
+
+    <div class="mb-3">
+        <label>CNPJ *</label>
+        <input type="text" name="cnpj" id="cnpj" class="form-control"
+               placeholder="00.000.000/0000-00" required>
+        <small class="form-text text-muted">Digite um CNPJ válido (formato: 00.000.000/0000-00)</small>
+        <div class="invalid-feedback">CNPJ inválido</div>
+    </div>
+
+    <div class="mb-3">
+        <label>CEP</label>
+        <input type="text" name="cep" id="cep" class="form-control"
+               placeholder="00000-000">
+        <small class="form-text text-muted">Digite o CEP para buscar endereço automaticamente</small>
+    </div>
+
+    <div class="mb-3">
+        <label>Rua</label>
+        <input type="text" name="rua" id="rua" class="form-control" readonly>
+    </div>
+
+    <div class="mb-3">
+        <label>Bairro</label>
+        <input type="text" name="bairro" id="bairro" class="form-control" readonly>
+    </div>
+
+    <div class="mb-3">
+        <label>Cidade</label>
+        <input type="text" name="cidade" id="cidade" class="form-control" readonly>
+    </div>
+
+    <div class="mb-3">
+        <label>Estado</label>
+        <input type="text" name="estado" id="estado" class="form-control" readonly>
+    </div>
+
     <button type="submit" class="btn btn-primary">Salvar</button>
     <a href="{{ url_for('list_empresas') }}" class="btn btn-secondary">Cancelar</a>
 </form>
+
 <script>
+// Função para validar CNPJ
+function validarCNPJ(cnpj) {
+    cnpj = cnpj.replace(/[^\d]/g, '');
+
+    if (cnpj.length !== 14) {
+        return false;
+    }
+
+    // Elimina CNPJs inválidos conhecidos
+    if (/^(\d)\1{13}$/.test(cnpj)) {
+        return false;
+    }
+
+    // Valida primeiro dígito
+    let tamanho = cnpj.length - 2;
+    let numeros = cnpj.substring(0, tamanho);
+    let digitos = cnpj.substring(tamanho);
+    let soma = 0;
+    let pos = tamanho - 7;
+
+    for (let i = tamanho; i >= 1; i--) {
+        soma += numeros.charAt(tamanho - i) * pos--;
+        if (pos < 2) {
+            pos = 9;
+        }
+    }
+
+    let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+    if (resultado != digitos.charAt(0)) {
+        return false;
+    }
+
+    // Valida segundo dígito
+    tamanho = tamanho + 1;
+    numeros = cnpj.substring(0, tamanho);
+    soma = 0;
+    pos = tamanho - 7;
+
+    for (let i = tamanho; i >= 1; i--) {
+        soma += numeros.charAt(tamanho - i) * pos--;
+        if (pos < 2) {
+            pos = 9;
+        }
+    }
+
+    resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+    if (resultado != digitos.charAt(1)) {
+        return false;
+    }
+
+    return true;
+}
+
+// Formatar CNPJ
+function formatarCNPJ(cnpj) {
+    cnpj = cnpj.replace(/[^\d]/g, '');
+    if (cnpj.length <= 2) return cnpj;
+    if (cnpj.length <= 5) return cnpj.replace(/(\d{2})(\d+)/, '$1.$2');
+    if (cnpj.length <= 8) return cnpj.replace(/(\d{2})(\d{3})(\d+)/, '$1.$2.$3');
+    if (cnpj.length <= 12) return cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d+)/, '$1.$2.$3/$4');
+    return cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+}
+
+// Validar CNPJ no input
+function validarCNPJInput() {
+    const input = document.getElementById('cnpj');
+    const cnpj = input.value;
+
+    if (cnpj && cnpj.trim() !== '') {
+        if (!validarCNPJ(cnpj)) {
+            input.classList.add('is-invalid');
+            return false;
+        } else {
+            input.classList.remove('is-invalid');
+            input.classList.add('is-valid');
+            input.value = formatarCNPJ(cnpj);
+            return true;
+        }
+    }
+    return true;
+}
+
+// Buscar endereço por CEP
 function buscarCep() {
-    let cep = document.getElementById('cep').value.replace(/\D/g,'');
-    if(cep.length != 8) return;
+    let cep = document.getElementById('cep').value.replace(/\D/g, '');
+    if (cep.length !== 8) {
+        return;
+    }
+
     fetch(`https://viacep.com.br/ws/${cep}/json/`)
-        .then(r => r.json())
+        .then(response => response.json())
         .then(data => {
-            if(!data.erro){
+            if (!data.erro) {
                 document.getElementById('rua').value = data.logradouro || '';
                 document.getElementById('bairro').value = data.bairro || '';
                 document.getElementById('cidade').value = data.localidade || '';
                 document.getElementById('estado').value = data.uf || '';
+                document.getElementById('cep').value = formatarCEP(cep);
+                document.getElementById('cep').classList.remove('is-invalid');
+                document.getElementById('cep').classList.add('is-valid');
+            } else {
+                document.getElementById('cep').classList.add('is-invalid');
+                alert('CEP não encontrado!');
             }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            document.getElementById('cep').classList.add('is-invalid');
+            alert('Erro ao buscar CEP. Tente novamente.');
         });
 }
+
+// Formatar CEP
+function formatarCEP(cep) {
+    cep = cep.replace(/\D/g, '');
+    if (cep.length === 8) {
+        return cep.replace(/(\d{5})(\d{3})/, '$1-$2');
+    }
+    return cep;
+}
+
+// Validar formulário antes de enviar
+document.getElementById('formEmpresa').addEventListener('submit', function(e) {
+    // Validar nome
+    const nome = document.getElementById('nome');
+    if (!nome.value || nome.value.trim() === '') {
+        e.preventDefault();
+        nome.classList.add('is-invalid');
+        alert('Nome da empresa é obrigatório!');
+        nome.focus();
+        return false;
+    } else {
+        nome.classList.remove('is-invalid');
+    }
+
+    // Validar CNPJ
+    const cnpj = document.getElementById('cnpj');
+    if (cnpj.value && cnpj.value.trim() !== '') {
+        if (!validarCNPJ(cnpj.value)) {
+            e.preventDefault();
+            cnpj.classList.add('is-invalid');
+            alert('CNPJ inválido! Corrija antes de salvar.');
+            cnpj.focus();
+            return false;
+        }
+    }
+
+    return true;
+});
+
+// Adicionar eventos
+document.getElementById('cnpj').addEventListener('blur', validarCNPJInput);
+document.getElementById('cnpj').addEventListener('input', function() {
+    this.classList.remove('is-invalid', 'is-valid');
+});
+
+document.getElementById('cep').addEventListener('blur', buscarCep);
+
+// Formatar CEP enquanto digita
+document.getElementById('cep').addEventListener('input', function() {
+    let cep = this.value.replace(/\D/g, '');
+    if (cep.length === 8) {
+        this.value = formatarCEP(cep);
+    }
+});
+
+// Remover validação ao digitar no nome
+document.getElementById('nome').addEventListener('input', function() {
+    this.classList.remove('is-invalid');
+});
 </script>
+
+<style>
+.is-valid {
+    border-color: #198754;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+.is-invalid {
+    border-color: #dc3545;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+</style>
 {% endblock %}

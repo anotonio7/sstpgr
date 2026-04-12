@@ -1,36 +1,102 @@
 {% extends "base.html" %}
+
 {% block content %}
 <div class="container mt-4">
-    <h2>Configuração do Certificado Digital</h2>
-    <p>Configure o certificado A1 (formato PFX) para envio dos eventos ao eSocial.</p>
+    <h2>Configuração de Certificado Digital</h2>
 
-    <form method="POST" enctype="multipart/form-data" action="{{ url_for('config_cert') }}">
-        <div class="mb-3">
-            <label for="cert_file" class="form-label">Arquivo PFX (certificado A1)</label>
-            <input type="file" class="form-control" id="cert_file" name="cert_file" accept=".pfx,.p12" required>
-            <div class="form-text">Selecione o arquivo do certificado digital (formato .pfx ou .p12).</div>
+    {% if empresas %}
+        <!-- Seleção de empresa -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Selecionar Empresa</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('config_certificado') }}">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <select name="empresa_id" class="form-select" onchange="this.form.submit()">
+                                <option value="">Selecione uma empresa</option>
+                                {% for e in empresas %}
+                                    <option value="{{ e.id }}" {% if empresa and e.id == empresa.id %}selected{% endif %}>
+                                        {{ e.nome }} ({{ e.cnpj }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-warning">
+            Nenhuma empresa encontrada. <a href="{{ url_for('dashboard') }}">Voltar ao dashboard</a>
+        </div>
+    {% endif %}
+
+    {% if empresa %}
+        <!-- Formulário de configuração -->
+        <div class="card">
+            <div class="card-header">
+                <h5>Configurar Certificado - {{ empresa.nome }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="empresa_id" value="{{ empresa.id }}">
+
+                    <div class="mb-3">
+                        <label for="certificado" class="form-label">Certificado Digital (PFX/P12)</label>
+                        <input type="file" class="form-control" id="certificado" name="certificado"
+                               accept=".pfx,.p12" {% if not config %}required{% endif %}>
+                        {% if config and config.certificado_pfx %}
+                            <small class="text-muted">
+                                Certificado atual: {{ config.certificado_pfx.split('/')[-1] }}
+                            </small>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="senha" class="form-label">Senha do Certificado</label>
+                        <input type="password" class="form-control" id="senha" name="senha"
+                               {% if not config %}required{% endif %}>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="ambiente" class="form-label">Ambiente</label>
+                        <select class="form-select" id="ambiente" name="ambiente">
+                            <option value="2" {% if config and config.ambiente == '2' %}selected{% endif %}>
+                                Produção
+                            </option>
+                            <option value="1" {% if config and config.ambiente == '1' %}selected{% endif %}>
+                                Testes
+                            </option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        {% if config %}Atualizar{% else %}Salvar{% endif %} Certificado
+                    </button>
+
+                    {% if config %}
+                        <a href="{{ url_for('testar_certificado', empresa_id=empresa.id) }}"
+                           class="btn btn-info">Testar Conexão</a>
+                    {% endif %}
+                </form>
+            </div>
         </div>
 
-        <div class="mb-3">
-            <label for="senha" class="form-label">Senha do Certificado</label>
-            <input type="password" class="form-control" id="senha" name="senha" required>
+        {% if config %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Informações do Certificado</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Arquivo:</strong> {{ config.certificado_pfx.split('/')[-1] }}</p>
+                <p><strong>Ambiente:</strong> {{ 'Produção' if config.ambiente == '2' else 'Testes' }}</p>
+                <p><strong>Data de Configuração:</strong> {{ config.data_config.strftime('%d/%m/%Y %H:%M') }}</p>
+                <p><strong>Última atualização:</strong> {{ config.data_config.strftime('%d/%m/%Y %H:%M') }}</p>
+            </div>
         </div>
-
-        <div class="mb-3">
-            <label for="ambiente" class="form-label">Ambiente</label>
-            <select class="form-select" id="ambiente" name="ambiente">
-                <option value="2">Homologação (testes)</option>
-                <option value="1">Produção</option>
-            </select>
-        </div>
-
-        <button type="submit" class="btn btn-primary">Salvar Configuração</button>
-        <a href="{{ url_for('list_s2220') }}" class="btn btn-secondary">Cancelar</a>
-    </form>
-
-    <hr>
-    <div class="alert alert-info mt-3">
-        <strong>Importante:</strong> O certificado será armazenado apenas durante a sessão (até o navegador ser fechado). Para produção, considere armazenar em variáveis de ambiente.
-    </div>
+        {% endif %}
+    {% endif %}
 </div>
 {% endblock %}

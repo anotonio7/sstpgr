@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if modelo %}Editar{% else %}Novo{% endif %} Modelo de Documento</h2>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="nome" class="form-label">Nome do Documento *</label>
+                            <input type="text" class="form-control" id="nome" name="nome"
+                                   value="{{ modelo.nome if modelo else '' }}" required>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="categoria" class="form-label">Categoria</label>
+                            <select class="form-control" id="categoria" name="categoria">
+                                <option value="aso" {% if modelo and modelo.categoria == 'aso' %}selected{% endif %}>ASO</option>
+                                <option value="cat" {% if modelo and modelo.categoria == 'cat' %}selected{% endif %}>CAT</option>
+                                <option value="ppra" {% if modelo and modelo.categoria == 'ppra' %}selected{% endif %}>PPRA</option>
+                                <option value="pcMSO" {% if modelo and modelo.categoria == 'pcMSO' %}selected{% endif %}>PCMSO</option>
+                                <option value="outro" {% if modelo and modelo.categoria == 'outro' %}selected{% endif %}>Outro</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-12">
+                        <div class="mb-3">
+                            <label for="descricao" class="form-label">Descrição</label>
+                            <textarea class="form-control" id="descricao" name="descricao" rows="3">{{ modelo.descricao if modelo else '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="tipo" class="form-label">Tipo de Documento *</label>
+                            <select class="form-control" id="tipo" name="tipo" required>
+                                <option value="pdf" {% if modelo and modelo.tipo == 'pdf' %}selected{% endif %}>Apenas PDF</option>
+                                <option value="word" {% if modelo and modelo.tipo == 'word' %}selected{% endif %}>Apenas Word</option>
+                                <option value="ambos" {% if modelo and modelo.tipo == 'ambos' %}selected{% endif %}>PDF e Word</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="versao" class="form-label">Versão</label>
+                            <input type="text" class="form-control" id="versao" name="versao"
+                                   value="{{ modelo.versao if modelo else '1.0' }}">
+                        </div>
+                    </div>
+
+
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="arquivo_pdf" class="form-label">Arquivo PDF {% if modelo and modelo.arquivo_path %}(atual){% endif %}</label>
+                            <input type="file" class="form-control" id="arquivo_pdf" name="arquivo_pdf" accept=".pdf">
+                            {% if modelo and modelo.arquivo_path %}
+                                <small class="text-muted">Arquivo atual: {{ modelo.arquivo_path.split('/')[-1] }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="arquivo_word" class="form-label">Arquivo Word {% if modelo and modelo.arquivo_word_path %}(atual){% endif %}</label>
+                            <input type="file" class="form-control" id="arquivo_word" name="arquivo_word" accept=".docx,.doc">
+                            {% if modelo and modelo.arquivo_word_path %}
+                                <small class="text-muted">Arquivo atual: {{ modelo.arquivo_word_path.split('/')[-1] }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-12">
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="ativo" name="ativo"
+                                   {% if not modelo or modelo.ativo %}checked{% endif %}>
+                            <label class="form-check-label" for="ativo">Ativo (disponível para clientes)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Salvar
+                    </button>
+                    <a href="{{ url_for('admin_modelos') }}" class="btn btn-secondary">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

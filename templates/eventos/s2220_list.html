@@ -1,39 +1,72 @@
 {% extends "base.html" %}
+
 {% block content %}
-<h2>Eventos S-2220 - Monitoramento da Saúde</h2>
-<a href="{{ url_for('create_s2220') }}" class="btn btn-primary mb-3">Novo Evento</a>
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Funcionário</th>
-            <th>Data do ASO</th>
-            <th>Médico</th>
-            <th>Qtd. Exames</th>
-            <th>Status</th>
-            <th>Ações</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for ev in eventos %}
-        <tr>
-            <td>{{ ev.id }}</td>
-            <td>{{ ev.funcionario.nome }}</td>
-            <td>{{ ev.data_aso.strftime('%d/%m/%Y') if ev.data_aso else '-' }}</td>
-            <td>{{ ev.crm_medico }}/{{ ev.uf_crm }}</td>
-            <td>{{ ev.exames|length }}</td>
-            <td>{{ ev.status }}</td>
-            <td>
-                <a href="{{ url_for('edit_s2220', id=ev.id) }}" class="btn btn-sm btn-warning">Editar</a>
-                <a href="{{ url_for('delete_s2220', id=ev.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza?')">Excluir</a>
-                {% if ev.status == 'pendente' %}
-                    <a href="{{ url_for('send_s2220', id=ev.id) }}" class="btn btn-sm btn-success">Enviar</a>
-                {% endif %}
-                <a href="{{ url_for('download_xml_s2220', id=ev.id) }}" class="btn btn-sm btn-info">XML</a>
-                <a href="{{ url_for('download_pdf_s2220', id=ev.id) }}" class="btn btn-sm btn-secondary">PDF</a>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4>Lista de ASO (S-2220)</h4>
+    </div>
+    <div class="card-body">
+        <a href="{{ url_for('create_s2220') }}" class="btn btn-success mb-3">
+            <i class="bi bi-plus-circle"></i> Novo ASO
+        </a>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Funcionário</th>
+                        <th>Data ASO</th>
+                        <th>CRM Médico</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for evento in eventos %}
+                    <tr>
+                        <td>{{ evento.id }}</td>
+                        <td>{{ evento.funcionario.nome }}</td>
+                        <td>{{ evento.data_aso.strftime('%d/%m/%Y') }}</td>  <!-- CORRIGIDO: data_aso -->
+                        <td>{{ evento.crm_medico }}/{{ evento.uf_crm }}</td>
+                        <td>
+                            {% if evento.status == 'enviado' %}
+                                <span class="badge bg-success">Enviado</span>
+                            {% else %}
+                                <span class="badge bg-warning">Pendente</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{{ url_for('view_xml_s2220', id=evento.id) }}" class="btn btn-info" target="_blank">📄 XML</a>
+                                <a href="{{ url_for('download_xml_s2220', id=evento.id) }}" class="btn btn-secondary">⬇️ XML</a>
+                                <a href="{{ url_for('download_pdf_s2220', id=evento.id) }}" class="btn btn-danger">📑 PDF</a>
+                                <a href="{{ url_for('edit_s2220', id=evento.id) }}" class="btn btn-warning">✏️ Editar</a>
+                                <a href="{{ url_for('delete_s2220', id=evento.id) }}" class="btn btn-danger" onclick="return confirm('Confirmar exclusão?')">🗑️ Excluir</a>
+
+                                {% if evento.status != 'enviado' %}
+                                <a href="{{ url_for('enviar_s2220', id=evento.id) }}" class="btn btn-success"
+                                   onclick="return confirm('Enviar este evento para o eSocial?')">
+                                    📤 Enviar
+                                </a>
+                                {% endif %}
+
+                                {% if evento.recibo %}
+                                <button class="btn btn-info" onclick="alert('Recibo: {{ evento.recibo }}')">
+                                    📋 Recibo
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center">Nenhum ASO cadastrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 {% endblock %}

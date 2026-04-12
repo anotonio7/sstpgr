@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Enviar XML Manual para o eSocial</h2>
+<form method="POST" enctype="multipart/form-data">
+    <div class="mb-3">
+        <label>Arquivo XML</label>
+        <input type="file" name="xml_file" class="form-control" accept=".xml" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Enviar</button>
+    <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

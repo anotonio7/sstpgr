@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-warning">
+        <h4>Debug - Respostas do eSocial</h4>
+    </div>
+    <div class="card-body">
+        <h5>Arquivos de resposta salvos:</h5>
+        <ul>
+            {% for arquivo in arquivos %}
+            <li>
+                <a href="{{ url_for('debug_ver_resposta', nome=arquivo) }}" target="_blank">
+                    {{ arquivo }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+
+        <div class="alert alert-info">
+            <strong>Dica:</strong> Os arquivos de resposta são salvos na pasta do sistema para debug.
+        </div>
+    </div>
+</div>
+{% endblock %}

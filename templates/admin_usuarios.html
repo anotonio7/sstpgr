@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-danger text-white">
+            <h4 class="mb-0">Gerenciamento de Usuários</h4>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>Nome</th>
+                        <th>Tipo</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuario in usuarios %}
+                    <tr>
+                        <td>{{ usuario[0] }}</td>
+                        <td>{{ usuario[1] }}</td>
+                        <td>{{ usuario[2] }}</td>
+                        <td>
+                            {% if usuario[3] == 'admin' %}
+                                <span class="badge bg-danger">Admin</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Cliente</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if usuario[3] != 'admin' %}
+                                <a href="{{ url_for('admin_tornar_admin', usuario_id=usuario[0]) }}"
+                                   class="btn btn-sm btn-warning">Tornar Admin</a>
+                                <a href="{{ url_for('admin_excluir_usuario', usuario_id=usuario[0]) }}"
+                                   class="btn btn-sm btn-danger"
+                                   onclick="return confirm('Excluir este usuário?')">Excluir</a>
+                            {% else %}
+                                {% if usuario[0] != current_user.id %}
+                                    <a href="{{ url_for('admin_tornar_cliente', usuario_id=usuario[0]) }}"
+                                       class="btn btn-sm btn-secondary">Rebaixar</a>
+                                {% else %}
+                                    <span class="text-muted">Você</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Voltar</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

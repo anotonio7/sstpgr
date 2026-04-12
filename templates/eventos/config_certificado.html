@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4>Configuração do Certificado Digital</h4>
+    </div>
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label>Certificado A1 (.pfx)</label>
+                <input type="file" name="certificado" class="form-control" accept=".pfx" required>
+                <small class="form-text text-muted">Arquivo .pfx do certificado digital</small>
+            </div>
+
+            <div class="mb-3">
+                <label>Senha do Certificado</label>
+                <input type="password" name="senha" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label>Ambiente</label>
+                <select name="ambiente" class="form-select" required>
+                    <option value="2">Homologação (Testes)</option>
+                    <option value="1">Produção</option>
+                </select>
+                <small class="form-text text-muted">Use homologação para testes</small>
+            </div>
+
+            {% if config %}
+            <div class="alert alert-info">
+                <strong>Configuração atual:</strong><br>
+                Certificado: {{ config.certificado_pfx.split('/')[-1] }}<br>
+                Ambiente: {{ 'Produção' if config.ambiente == '1' else 'Homologação' }}
+            </div>
+            {% endif %}
+
+            <button type="submit" class="btn btn-primary">Salvar Configuração</button>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header bg-info text-white">
+        <h4>Como obter um certificado digital</h4>
+    </div>
+    <div class="card-body">
+        <p>Para enviar eventos ao eSocial, você precisa de um certificado digital A1:</p>
+        <ul>
+            <li>Certificado padrão ICP-Brasil (e-CNPJ ou e-CPF)</li>
+            <li>Formatos aceitos: .pfx ou .p12</li>
+            <li>Adquirir em autoridades certificadoras: Serasa, Certisign, Soluti, etc.</li>
+        </ul>
+        <p><strong>Para testes:</strong> Use o ambiente de Homologação com certificado de testes.</p>
+    </div>
+</div>
+{% endblock %}

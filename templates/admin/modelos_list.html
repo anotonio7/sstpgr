@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-file-text"></i> Modelos de Documentos</h2>
+        <a href="{{ url_for('admin_modelo_novo') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Novo Modelo
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>Categoria</th>
+                            <th>Tipo</th>
+                            <th>Versão</th>
+                            <th>Status</th>
+                            <th>Criado em</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for modelo in modelos %}
+                        <tr>
+                            <td>{{ modelo.id }}</td>
+                            <td>{{ modelo.nome }}</td>
+                            <td>
+                                <span class="badge bg-info">{{ modelo.categoria or 'Geral' }}</span>
+                            </td>
+                            <td>
+                                {% if modelo.tipo == 'pdf' %}
+                                    <span class="badge bg-danger">PDF</span>
+                                {% elif modelo.tipo == 'word' %}
+                                    <span class="badge bg-primary">Word</span>
+                                {% else %}
+                                    <span class="badge bg-success">PDF + Word</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ modelo.versao }}</td>
+                            <td>
+                                {% if modelo.ativo %}
+                                    <span class="badge bg-success">Ativo</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inativo</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ modelo.data_criacao.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <a href="{{ url_for('admin_modelo_editar', id=modelo.id) }}" class="btn btn-sm btn-warning">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{{ url_for('admin_modelo_excluir', id=modelo.id) }}"
+                                   class="btn btn-sm btn-danger"
+                                   onclick="return confirm('Tem certeza?')">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

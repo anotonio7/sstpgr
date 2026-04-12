@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4>Configuração do Certificado Digital</h4>
+    </div>
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label>Certificado A1 (.pfx ou .p12)</label>
+                <input type="file" name="certificado" class="form-control" accept=".pfx,.p12" required>
+                <small class="form-text text-muted">Arquivo do certificado digital no formato .pfx ou .p12</small>
+            </div>
+
+            <div class="mb-3">
+                <label>Senha do Certificado</label>
+                <input type="password" name="senha" class="form-control" required>
+                <small class="form-text text-muted">Senha do certificado digital</small>
+            </div>
+
+            <div class="mb-3">
+                <label>Ambiente</label>
+                <select name="ambiente" class="form-select" required>
+                    <option value="2" {% if config and config.ambiente == '2' %}selected{% endif %}>Homologação (Testes)</option>
+                    <option value="1" {% if config and config.ambiente == '1' %}selected{% endif %}>Produção</option>
+                </select>
+                <small class="form-text text-muted">Use homologação para testes antes de ir para produção</small>
+            </div>
+
+            {% if config %}
+            <div class="alert alert-info">
+                <strong>Configuração atual:</strong><br>
+                Certificado: {{ config.certificado_pfx.split('/')[-1] }}<br>
+                Ambiente: {% if config.ambiente == '1' %}Produção{% else %}Homologação{% endif %}<br>
+                Status: <span class="badge bg-success">Configurado</span>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                <strong>Nenhum certificado configurado!</strong><br>
+                Você precisa configurar um certificado digital para enviar eventos ao eSocial.
+            </div>
+            {% endif %}
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Salvar Configuração
+                </button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header bg-info text-white">
+        <h4>Como obter um certificado digital</h4>
+    </div>
+    <div class="card-body">
+        <p>Para enviar eventos ao eSocial, você precisa de um certificado digital padrão ICP-Brasil (e-CNPJ ou e-CPF) no formato A1:</p>
+
+        <h5>Requisitos:</h5>
+        <ul>
+            <li>Certificado digital válido (e-CNPJ ou e-CPF)</li>
+            <li>Formato .pfx ou .p12</li>
+            <li>Senha do certificado</li>
+        </ul>
+
+        <h5>Onde adquirir:</h5>
+        <ul>
+            <li>Serasa Experian</li>
+            <li>Certisign</li>
+            <li>Soluti</li>
+            <li>Valid</li>
+            <li>Outras autoridades certificadoras ICP-Brasil</li>
+        </ul>
+
+        <h5>Para testes (Homologação):</h5>
+        <ul>
+            <li>Use certificado de testes fornecido pelo eSocial</li>
+            <li>Ambiente de homologação aceita certificados auto-assinados para testes</li>
+        </ul>
+
+        <div class="alert alert-warning">
+            <strong>Atenção:</strong> Mantenha seu certificado e senha em local seguro. Nunca compartilhe.
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header bg-secondary text-white">
+        <h4>Instruções para envio de eventos</h4>
+    </div>
+    <div class="card-body">
+        <ol>
+            <li>Configure o certificado digital acima</li>
+            <li>Crie os eventos (S-2220, S-2221, S-2210, S-2240)</li>
+            <li>Na lista de eventos, clique em "Enviar eSocial"</li>
+            <li>Aguarde o retorno do recibo de validação</li>
+            <li>Verifique o recibo para confirmar o envio</li>
+        </ol>
+
+        <h5>Status dos eventos:</h5>
+        <ul>
+            <li><span class="badge bg-warning">Pendente</span> - Aguardando envio</li>
+            <li><span class="badge bg-success">Enviado</span> - Evento transmitido ao eSocial</li>
+        </ul>
+
+        <h5>Recibo:</h5>
+        <p>Após o envio, um recibo é gerado e armazenado. Clique em "Ver Recibo" para visualizar.</p>
+    </div>
+</div>
+{% endblock %}

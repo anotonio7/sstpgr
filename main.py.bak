@@ -6,12 +6,15 @@ from functools import wraps
 import sqlite3
 import hashlib
 import secrets
-
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import re
 from datetime import datetime, timedelta
-
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 from io import BytesIO
-
+import logging
 
 from esocial_utils import (
     carregar_certificado, assinar_xml, gerar_xml_s2220, gerar_xml_s2221,
@@ -27,26 +30,6 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
-from models import Empresa, Funcionario, EventoS2220, S2220Exame, EventoS2221, EventoS2210, EventoS2240, RiscoS2240, \
-    ConfigCertificado, Usuario, ConfigSistema  # Adicione ConfigSistema aqui
-import os
-from werkzeug.utils import secure_filename
-# No topo do main.py, adicione:
-# Em vez de:
-# CORRETO (use Usuario):
-from models import (
-    db,
-    Usuario,   # ✅ Correto
-    Empresa,
-    Funcionario,
-    EventoS2220,
-    EventoS2221,
-    EventoS2210,
-    EventoS2240,
-    ModeloDocumento
-)
-# Use:
-from models import *
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'chave-secreta-mude-em-producao-123456'
@@ -537,41 +520,6 @@ def edit_funcionario_form(id):
     f = Funcionario.query.get_or_404(id)
     empresas = Empresa.query.all()
     return render_template('funcionario_edit.html', f=f, empresas=empresas)
-
-
-# main.py
-@app.route('/enviar_evento/<int:funcionario_id>')
-@login_required
-def enviar_evento(funcionario_id):
-    funcionario = Funcionario.query.get_or_404(funcionario_id)
-
-    # Verificar se o funcionário pertence a uma empresa do cliente
-    if current_user.tipo != 'admin':
-        empresa = Empresa.query.filter_by(
-            id=funcionario.empresa_id,
-            usuario_id=current_user.id
-        ).first()
-
-        if not empresa:
-            flash('Sem permissão para este funcionário.', 'danger')
-            return redirect(url_for('dashboard'))
-    else:
-        empresa = Empresa.query.get(funcionario.empresa_id)
-
-    # Buscar o certificado da empresa
-    certificado = ConfigCertificado.query.filter_by(empresa_id=empresa.id).first()
-
-    if not certificado:
-        flash(f'Empresa {empresa.nome} não possui certificado configurado.', 'warning')
-        return redirect(url_for('dashboard'))
-
-    # Usar o certificado para enviar ao eSocial
-    # ... código de envio usando o certificado da empresa
-
-    return render_template('enviar_evento.html',
-                           funcionario=funcionario,
-                           empresa=empresa,
-                           certificado=certificado)
 
 
 # ================= FUNÇÃO DE VALIDAÇÃO DE CPF =================
@@ -1997,18 +1945,18 @@ def carregar_certificado(pfx_path, senha):
 
         # Tentar diferentes encodings para a senha
         try:
-            private_key, certificate, additional_certificates = pkcs12.load_key_and_certificates(
+            private_key, certificate, _ = pkcs12.load_key_and_certificates(
                 pfx_data,
                 senha.encode('utf-8')
             )
-        except Exception:
+        except:
             try:
-                private_key, certificate, additional_certificates = pkcs12.load_key_and_certificates(
+                private_key, certificate, _ = pkcs12.load_key_and_certificates(
                     pfx_data,
                     senha.encode('latin-1')
                 )
-            except Exception:
-                private_key, certificate, additional_certificates = pkcs12.load_key_and_certificates(
+            except:
+                private_key, certificate, _ = pkcs12.load_key_and_certificates(
                     pfx_data,
                     senha.encode('cp1252')
                 )
@@ -2029,81 +1977,38 @@ def carregar_certificado(pfx_path, senha):
 
     except Exception as e:
         print(f"❌ Erro ao carregar certificado: {e}")
-        raise Exception(
-            f"Erro ao carregar certificado: Verifique a senha e o arquivo. Detalhe: {str(e)}"
-        )
+        raise Exception(f"Erro ao carregar certificado: Verifique a senha e o arquivo. Detalhe: {str(e)}")
 
 
-# main.py
 @app.route('/config_certificado', methods=['GET', 'POST'])
 @login_required
 def config_certificado():
-    if current_user.tipo == 'admin':
-        # Admin pode ver todas as empresas
-        empresas = Empresa.query.all()
-        if request.method == 'POST':
-            empresa_id = request.form.get('empresa_id')
-            empresa = Empresa.query.get(empresa_id)
-        else:
-            # GET - pega a primeira empresa ou None
-            empresa = empresas[0] if empresas else None
-    else:
-        # Cliente só vê suas empresas
-        empresas = Empresa.query.filter_by(usuario_id=current_user.id).all()
-        if request.method == 'POST':
-            empresa_id = request.form.get('empresa_id')
-            empresa = Empresa.query.filter_by(
-                id=empresa_id,
-                usuario_id=current_user.id
-            ).first()
-        else:
-            # GET - pega a primeira empresa do cliente
-            empresa = empresas[0] if empresas else None
-
-    # Buscar configuração existente para a empresa selecionada
-    config = None
-    if empresa:
-        config = ConfigCertificado.query.filter_by(empresa_id=empresa.id).first()
-
     if request.method == 'POST':
-        # Processar o upload do certificado
-        certificado = request.files.get('certificado')
+        pfx_file = request.files.get('certificado')
         senha = request.form.get('senha')
-        ambiente = request.form.get('ambiente', '2')
+        ambiente = request.form.get('ambiente')
 
-        if certificado and certificado.filename:
-            # Salvar o arquivo
-            filename = secure_filename(f"{empresa.cnpj}_{certificado.filename}")
+        if pfx_file:
+            filename = secure_filename(f"cert_{datetime.now().timestamp()}.pfx")
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            certificado.save(filepath)
+            pfx_file.save(filepath)
 
-            if config:
-                # Atualizar configuração existente
-                config.certificado_pfx = filepath
-                config.senha = senha
-                config.ambiente = ambiente
-                config.data_config = datetime.utcnow()
-            else:
-                # Criar nova configuração
-                config = ConfigCertificado(
-                    empresa_id=empresa.id,
-                    usuario_id=current_user.id,
-                    certificado_pfx=filepath,
-                    senha=senha,
-                    ambiente=ambiente
-                )
-                db.session.add(config)
+            # Versão simplificada - SEM validação de certificado
+            cfg = ConfigCertificado.query.first()
+            if not cfg:
+                cfg = ConfigCertificado()
+                db.session.add(cfg)
 
+            cfg.certificado_pfx = filepath
+            cfg.senha = senha
+            cfg.ambiente = ambiente
             db.session.commit()
-            flash('Certificado configurado com sucesso!', 'success')
-            return redirect(url_for('config_certificado'))
-        else:
-            flash('Selecione um arquivo de certificado.', 'danger')
 
-    return render_template('config_certificado.html',
-                           empresas=empresas,
-                           empresa=empresa,
-                           config=config)
+            flash('Certificado configurado com sucesso! (Modo simplificado)', 'success')
+            return redirect(url_for('dashboard'))
+
+    config = ConfigCertificado.query.first()
+    return render_template('config_certificado.html', config=config)
 
 @app.route('/s2220/enviar/<int:id>')
 @login_required
@@ -2120,11 +2025,9 @@ def enviar_s2220(id):
         return redirect(url_for('config_certificado'))
 
     try:
-        # Versão simplificada - não usa certificado real
-        from esocial_utils import gerar_xml_s2220, enviar_lote
-
+        cert_pem, key_pem = carregar_certificado(cfg.certificado_pfx, cfg.senha)
         xml = gerar_xml_s2220(evento, evento.funcionario.empresa, evento.funcionario, cfg.ambiente)
-        xml_assinado = xml  # Sem assinatura no modo simplificado
+        xml_assinado = assinar_xml(xml, cert_pem, key_pem)
         recibo = enviar_lote(xml_assinado, cfg.ambiente)
 
         evento.xml_enviado = xml_assinado
@@ -2133,14 +2036,14 @@ def enviar_s2220(id):
         evento.data_envio = datetime.now()
         db.session.commit()
 
-        flash(f'Evento enviado com sucesso! Recibo: {recibo}', 'success')
+        flash(f'Evento enviado com sucesso! Recibo: {recibo[:50]}...', 'success')
     except Exception as e:
         flash(f'Erro ao enviar: {str(e)}', 'danger')
 
     return redirect(url_for('list_s2220'))
 
 
-# ================= ENVIO S-2221 (MODO TESTE) =================
+# ================= ENVIO S-2221 =================
 @app.route('/s2221/enviar/<int:id>')
 @login_required
 def enviar_s2221(id):
@@ -2150,29 +2053,31 @@ def enviar_s2221(id):
         flash('Evento já foi enviado!', 'warning')
         return redirect(url_for('list_s2221'))
 
+    cfg = ConfigCertificado.query.first()
+    if not cfg:
+        flash('Configure o certificado digital primeiro!', 'danger')
+        return redirect(url_for('config_certificado'))
+
     try:
-        from esocial_utils import gerar_xml_s2221, enviar_lote
+        cert_pem, key_pem = carregar_certificado(cfg.certificado_pfx, cfg.senha)
+        xml = gerar_xml_s2221(evento, evento.funcionario.empresa, evento.funcionario, cfg.ambiente)
+        xml_assinado = assinar_xml(xml, cert_pem, key_pem)
+        recibo = enviar_lote(xml_assinado, cfg.ambiente)
 
-        # Gera o XML
-        xml = gerar_xml_s2221(evento, evento.funcionario.empresa, evento.funcionario, '2')
-
-        # Envia (modo teste - sem certificado)
-        recibo = enviar_lote(xml, '2')
-
-        evento.xml_enviado = xml
+        evento.xml_enviado = xml_assinado
         evento.recibo = recibo
         evento.status = 'enviado'
         evento.data_envio = datetime.now()
         db.session.commit()
 
-        flash(f'✅ Evento S-2221 enviado com sucesso! Recibo: {recibo[:100]}...', 'success')
+        flash(f'Evento S-2221 enviado com sucesso! Recibo: {recibo[:50]}...', 'success')
     except Exception as e:
-        flash(f'❌ Erro ao enviar: {str(e)}', 'danger')
+        flash(f'Erro ao enviar: {str(e)}', 'danger')
 
     return redirect(url_for('list_s2221'))
 
 
-# ================= ENVIO S-2210 (MODO TESTE) =================
+# ================= ENVIO S-2210 =================
 @app.route('/s2210/enviar/<int:id>')
 @login_required
 def enviar_s2210(id):
@@ -2182,29 +2087,31 @@ def enviar_s2210(id):
         flash('Evento já foi enviado!', 'warning')
         return redirect(url_for('list_s2210'))
 
+    cfg = ConfigCertificado.query.first()
+    if not cfg:
+        flash('Configure o certificado digital primeiro!', 'danger')
+        return redirect(url_for('config_certificado'))
+
     try:
-        from esocial_utils import gerar_xml_s2210, enviar_lote
+        cert_pem, key_pem = carregar_certificado(cfg.certificado_pfx, cfg.senha)
+        xml = gerar_xml_s2210(evento, evento.funcionario.empresa, evento.funcionario, cfg.ambiente)
+        xml_assinado = assinar_xml(xml, cert_pem, key_pem)
+        recibo = enviar_lote(xml_assinado, cfg.ambiente)
 
-        # Gera o XML
-        xml = gerar_xml_s2210(evento, evento.funcionario.empresa, evento.funcionario, '2')
-
-        # Envia (modo teste - sem certificado)
-        recibo = enviar_lote(xml, '2')
-
-        evento.xml_enviado = xml
+        evento.xml_enviado = xml_assinado
         evento.recibo = recibo
         evento.status = 'enviado'
         evento.data_envio = datetime.now()
         db.session.commit()
 
-        flash(f'✅ Evento S-2210 enviado com sucesso! Recibo: {recibo[:100]}...', 'success')
+        flash(f'Evento S-2210 enviado com sucesso! Recibo: {recibo[:50]}...', 'success')
     except Exception as e:
-        flash(f'❌ Erro ao enviar: {str(e)}', 'danger')
+        flash(f'Erro ao enviar: {str(e)}', 'danger')
 
     return redirect(url_for('list_s2210'))
 
 
-# ================= ENVIO S-2240 (MODO TESTE) =================
+# ================= ENVIO S-2240 =================
 @app.route('/s2240/enviar/<int:id>')
 @login_required
 def enviar_s2240(id):
@@ -2214,780 +2121,29 @@ def enviar_s2240(id):
         flash('Evento já foi enviado!', 'warning')
         return redirect(url_for('list_s2240'))
 
+    cfg = ConfigCertificado.query.first()
+    if not cfg:
+        flash('Configure o certificado digital primeiro!', 'danger')
+        return redirect(url_for('config_certificado'))
+
     try:
-        from esocial_utils import gerar_xml_s2240, enviar_lote
+        cert_pem, key_pem = carregar_certificado(cfg.certificado_pfx, cfg.senha)
+        xml = gerar_xml_s2240(evento, evento.funcionario.empresa, evento.funcionario, cfg.ambiente)
+        xml_assinado = assinar_xml(xml, cert_pem, key_pem)
+        recibo = enviar_lote(xml_assinado, cfg.ambiente)
 
-        # Gera o XML
-        xml = gerar_xml_s2240(evento, evento.funcionario.empresa, evento.funcionario, '2')
-
-        # Envia (modo teste - sem certificado)
-        recibo = enviar_lote(xml, '2')
-
-        evento.xml_enviado = xml
+        evento.xml_enviado = xml_assinado
         evento.recibo = recibo
         evento.status = 'enviado'
         evento.data_envio = datetime.now()
         db.session.commit()
 
-        flash(f'✅ Evento S-2240 enviado com sucesso! Recibo: {recibo[:100]}...', 'success')
+        flash(f'Evento S-2240 enviado com sucesso! Recibo: {recibo[:50]}...', 'success')
     except Exception as e:
-        flash(f'❌ Erro ao enviar: {str(e)}', 'danger')
+        flash(f'Erro ao enviar: {str(e)}', 'danger')
 
     return redirect(url_for('list_s2240'))
 
-@app.route('/recibos')
-@login_required
-def listar_recibos():
-    """Lista todos os recibos de envio"""
-    recibos = []
-
-    # Busca recibos de todos os tipos de evento
-    for evento in EventoS2220.query.filter(EventoS2220.recibo.isnot(None)).all():
-        recibos.append({
-            'id': evento.id,
-            'tipo': 'S-2220 (ASO)',
-            'tipo_url': 's2220',  # NOVO
-            'funcionario': evento.funcionario.nome,
-            'recibo': evento.recibo,
-            'data_envio': evento.data_envio,
-            'status': evento.status,
-            'nome_xml': f'S2220_{evento.funcionario.nome}_{evento.data_aso}.xml'
-        })
-
-    for evento in EventoS2221.query.filter(EventoS2221.recibo.isnot(None)).all():
-        recibos.append({
-            'id': evento.id,
-            'tipo': 'S-2221 (Exame Toxicológico)',
-            'tipo_url': 's2221',  # NOVO
-            'funcionario': evento.funcionario.nome,
-            'recibo': evento.recibo,
-            'data_envio': evento.data_envio,
-            'status': evento.status,
-            'nome_xml': f'S2221_{evento.funcionario.nome}_{evento.data_exame}.xml'
-        })
-
-    for evento in EventoS2210.query.filter(EventoS2210.recibo.isnot(None)).all():
-        recibos.append({
-            'id': evento.id,
-            'tipo': 'S-2210 (CAT)',
-            'tipo_url': 's2210',  # NOVO
-            'funcionario': evento.funcionario.nome,
-            'recibo': evento.recibo,
-            'data_envio': evento.data_envio,
-            'status': evento.status,
-            'nome_xml': f'S2210_{evento.funcionario.nome}_{evento.data_acidente}.xml'
-        })
-
-    for evento in EventoS2240.query.filter(EventoS2240.recibo.isnot(None)).all():
-        recibos.append({
-            'id': evento.id,
-            'tipo': 'S-2240 (Riscos Ambientais)',
-            'tipo_url': 's2240',  # NOVO
-            'funcionario': evento.funcionario.nome,
-            'recibo': evento.recibo,
-            'data_envio': evento.data_envio,
-            'status': evento.status,
-            'nome_xml': f'S2240_{evento.funcionario.nome}_{evento.data_avaliacao}.xml'
-        })
-
-    # Ordenar por data de envio (mais recente primeiro)
-    recibos.sort(key=lambda x: x['data_envio'] or datetime.min, reverse=True)
-
-    return render_template('recibos.html', recibos=recibos)
-
-
-@app.route('/debug/respostas')
-@login_required
-def debug_respostas():
-    """Lista as respostas do eSocial salvas para debug"""
-    import glob
-    arquivos = glob.glob('resposta_esocial_*.xml')
-    arquivos.sort(reverse=True)
-
-    return render_template('debug_respostas.html', arquivos=arquivos)
-
-
-@app.route('/debug/resposta/<nome>')
-@login_required
-def debug_ver_resposta(nome):
-    """Visualiza uma resposta específica"""
-    import os
-    if os.path.exists(nome):
-        with open(nome, 'r', encoding='utf-8') as f:
-            conteudo = f.read()
-        return Response(conteudo, mimetype='text/xml')
-    return "Arquivo não encontrado", 404
-
-
-def gerar_pdf_recibo(recibo_info):
-    """Gera PDF do recibo para entregar ao cliente - Versão simplificada"""
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import cm
-    from io import BytesIO
-
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        topMargin=2 * cm,
-        bottomMargin=2 * cm,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm,
-        title=f"Recibo_eSocial_{recibo_info['evento_tipo']}_{recibo_info['id']}"
-    )
-
-    styles = getSampleStyleSheet()
-
-    # Cores
-    cor_primaria = colors.HexColor('#2c3e50')
-    cor_secundaria = colors.HexColor('#3498db')
-    cor_sucesso = colors.HexColor('#27ae60')
-    cor_borda = colors.HexColor('#bdc3c7')
-
-    # Estilos personalizados
-    style_titulo = ParagraphStyle(
-        name='Titulo',
-        parent=styles['Heading1'],
-        fontSize=20,
-        textColor=cor_primaria,
-        alignment=1,
-        spaceAfter=30,
-        fontName='Helvetica-Bold'
-    )
-
-    style_subtitulo = ParagraphStyle(
-        name='Subtitulo',
-        parent=styles['Heading2'],
-        fontSize=14,
-        textColor=cor_secundaria,
-        spaceAfter=20,
-        fontName='Helvetica-Bold'
-    )
-
-    style_normal = ParagraphStyle(
-        name='Normal',
-        parent=styles['Normal'],
-        fontSize=10,
-        fontName='Helvetica',
-        spaceAfter=6
-    )
-
-    style_codigo = ParagraphStyle(
-        name='Codigo',
-        parent=styles['Normal'],
-        fontSize=9,
-        fontName='Courier',
-        textColor=colors.HexColor('#333333'),
-        backColor=colors.HexColor('#f5f5f5'),
-        leftIndent=10,
-        rightIndent=10,
-        spaceAfter=10
-    )
-
-    # Função para cabeçalho e rodapé
-    def add_header_footer(canvas, doc):
-        canvas.saveState()
-
-        # Cabeçalho
-        canvas.setFont('Helvetica-Bold', 10)
-        canvas.setFillColor(cor_primaria)
-        canvas.drawString(doc.leftMargin, doc.height + doc.topMargin - 10, "COMPROVANTE DE ENVIO - eSocial")
-
-        # Linha do cabeçalho
-        canvas.setStrokeColor(cor_borda)
-        canvas.setLineWidth(0.5)
-        canvas.line(doc.leftMargin, doc.height + doc.topMargin - 15,
-                    doc.width + doc.leftMargin, doc.height + doc.topMargin - 15)
-
-        # Rodapé
-        canvas.setFont('Helvetica', 8)
-        canvas.setFillColor(colors.grey)
-        canvas.drawString(doc.leftMargin, doc.bottomMargin - 10,
-                          f"Documento gerado eletronicamente em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-        canvas.drawRightString(doc.width + doc.leftMargin, doc.bottomMargin - 10, f"Página {doc.page}")
-
-        canvas.restoreState()
-
-    story = []
-
-    # Título
-    story.append(Paragraph("COMPROVANTE DE ENVIO AO eSOCIAL", style_titulo))
-    story.append(Spacer(1, 20))
-
-    # Informações do evento
-    story.append(Paragraph("DADOS DO EVENTO", style_subtitulo))
-
-    dados_evento = [
-        ["Tipo de Evento:", recibo_info['evento_tipo']],
-        ["ID do Evento:", str(recibo_info['id'])],
-        ["Funcionário:", recibo_info['funcionario_nome']],
-        ["CPF:", recibo_info['funcionario_cpf']],
-        ["Data do Evento:", recibo_info['data_evento']],
-        ["Data de Envio:", recibo_info['data_envio']],
-    ]
-
-    tabela_evento = Table(dados_evento, colWidths=[5 * cm, 11 * cm])
-    tabela_evento.setStyle(TableStyle([
-        ('GRID', (0, 0), (-1, -1), 0.5, cor_borda),
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ecf0f1')),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-    ]))
-    story.append(tabela_evento)
-    story.append(Spacer(1, 20))
-
-    # Recibo - Versão simplificada sem HTML
-    story.append(Paragraph("RECIBO DO eSOCIAL", style_subtitulo))
-
-    # Limpa o recibo - remove tags HTML se houver
-    recibo_limpo = recibo_info['recibo']
-    # Se for HTML, pega apenas o texto relevante
-    if recibo_limpo.startswith('<!DOCTYPE') or recibo_limpo.startswith('<html'):
-        recibo_limpo = "Recibo recebido do eSocial. Consulte o sistema para mais detalhes."
-
-    # Adiciona o recibo como texto plano
-    story.append(Paragraph(recibo_limpo.replace('\n', '<br/>'), style_codigo))
-    story.append(Spacer(1, 20))
-
-    # Status
-    story.append(Paragraph("STATUS DO ENVIO", style_subtitulo))
-
-    status_cor = cor_sucesso if recibo_info['status'] == 'enviado' else colors.HexColor('#e74c3c')
-    status_texto = "ENVIADO COM SUCESSO" if recibo_info['status'] == 'enviado' else "ERRO NO ENVIO"
-
-    story.append(Paragraph(f"<font color='{status_cor}'><b>{status_texto}</b></font>", style_normal))
-    story.append(Spacer(1, 20))
-
-    # Informações do XML
-    story.append(Paragraph("INFORMAÇÕES DO ARQUIVO", style_subtitulo))
-
-    dados_xml = [
-        ["Nome do Arquivo:", recibo_info['nome_xml']],
-        ["Tamanho:", recibo_info['tamanho_xml']],
-    ]
-
-    tabela_xml = Table(dados_xml, colWidths=[5 * cm, 11 * cm])
-    tabela_xml.setStyle(TableStyle([
-        ('GRID', (0, 0), (-1, -1), 0.5, cor_borda),
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ecf0f1')),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-    ]))
-    story.append(tabela_xml)
-    story.append(Spacer(1, 30))
-
-    # Assinatura
-    story.append(Paragraph("_________________________________________", style_normal))
-    story.append(Paragraph("Assinatura do Responsável", style_normal))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph(f"<font size='8'>Sistema SST - {datetime.now().strftime('%Y')}</font>", style_normal))
-
-    # Rodapé adicional
-    story.append(Spacer(1, 20))
-    story.append(Paragraph(
-        "<font size='8' color='grey'>Este documento comprova o envio do evento ao sistema eSocial. Em caso de dúvidas, consulte o sistema.</font>",
-        style_normal))
-
-    doc.build(story, onFirstPage=add_header_footer, onLaterPages=add_header_footer)
-    buffer.seek(0)
-    return buffer
-
-@app.route('/recibo/pdf/<tipo>/<int:id>')
-@login_required
-def download_recibo_pdf(tipo, id):
-    """Baixar PDF do recibo"""
-    try:
-        from io import BytesIO
-        from datetime import datetime
-
-        recibo_info = None
-
-        if tipo == 's2220':
-            evento = EventoS2220.query.get_or_404(id)
-            if evento.recibo:
-                recibo_info = {
-                    'id': evento.id,
-                    'evento_tipo': 'S-2220 - ASO (Atestado de Saúde Ocupacional)',
-                    'funcionario_nome': evento.funcionario.nome,
-                    'funcionario_cpf': evento.funcionario.cpf,
-                    'data_evento': evento.data_aso.strftime('%d/%m/%Y'),
-                    'data_envio': evento.data_envio.strftime(
-                        '%d/%m/%Y %H:%M:%S') if evento.data_envio else 'Não informada',
-                    'recibo': evento.recibo,
-                    'status': evento.status,
-                    'nome_xml': f'S2220_{evento.funcionario.nome}_{evento.data_aso}.xml',
-                    'tamanho_xml': f"{len(evento.xml_enviado or '') / 1024:.2f} KB" if evento.xml_enviado else 'N/A'
-                }
-
-        elif tipo == 's2221':
-            evento = EventoS2221.query.get_or_404(id)
-            if evento.recibo:
-                recibo_info = {
-                    'id': evento.id,
-                    'evento_tipo': 'S-2221 - Exame Toxicológico',
-                    'funcionario_nome': evento.funcionario.nome,
-                    'funcionario_cpf': evento.funcionario.cpf,
-                    'data_evento': evento.data_exame.strftime('%d/%m/%Y'),
-                    'data_envio': evento.data_envio.strftime(
-                        '%d/%m/%Y %H:%M:%S') if evento.data_envio else 'Não informada',
-                    'recibo': evento.recibo,
-                    'status': evento.status,
-                    'nome_xml': f'S2221_{evento.funcionario.nome}_{evento.data_exame}.xml',
-                    'tamanho_xml': f"{len(evento.xml_enviado or '') / 1024:.2f} KB" if evento.xml_enviado else 'N/A'
-                }
-
-        elif tipo == 's2210':
-            evento = EventoS2210.query.get_or_404(id)
-            if evento.recibo:
-                recibo_info = {
-                    'id': evento.id,
-                    'evento_tipo': 'S-2210 - CAT (Comunicação de Acidente de Trabalho)',
-                    'funcionario_nome': evento.funcionario.nome,
-                    'funcionario_cpf': evento.funcionario.cpf,
-                    'data_evento': evento.data_acidente.strftime('%d/%m/%Y'),
-                    'data_envio': evento.data_envio.strftime(
-                        '%d/%m/%Y %H:%M:%S') if evento.data_envio else 'Não informada',
-                    'recibo': evento.recibo,
-                    'status': evento.status,
-                    'nome_xml': f'S2210_{evento.funcionario.nome}_{evento.data_acidente}.xml',
-                    'tamanho_xml': f"{len(evento.xml_enviado or '') / 1024:.2f} KB" if evento.xml_enviado else 'N/A'
-                }
-
-        elif tipo == 's2240':
-            evento = EventoS2240.query.get_or_404(id)
-            if evento.recibo:
-                recibo_info = {
-                    'id': evento.id,
-                    'evento_tipo': 'S-2240 - Condições Ambientais do Trabalho',
-                    'funcionario_nome': evento.funcionario.nome,
-                    'funcionario_cpf': evento.funcionario.cpf,
-                    'data_evento': evento.data_avaliacao.strftime('%d/%m/%Y'),
-                    'data_envio': evento.data_envio.strftime(
-                        '%d/%m/%Y %H:%M:%S') if evento.data_envio else 'Não informada',
-                    'recibo': evento.recibo,
-                    'status': evento.status,
-                    'nome_xml': f'S2240_{evento.funcionario.nome}_{evento.data_avaliacao}.xml',
-                    'tamanho_xml': f"{len(evento.xml_enviado or '') / 1024:.2f} KB" if evento.xml_enviado else 'N/A'
-                }
-
-        if not recibo_info:
-            flash('Recibo não encontrado para este evento', 'warning')
-            return redirect(url_for('listar_recibos'))
-
-        pdf_buffer = gerar_pdf_recibo(recibo_info)
-
-        return send_file(
-            pdf_buffer,
-            as_attachment=True,
-            download_name=f"Recibo_{tipo.upper()}_{id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-            mimetype='application/pdf'
-        )
-
-    except Exception as e:
-        flash(f'Erro ao gerar PDF do recibo: {str(e)}', 'danger')
-        print(f"Erro detalhado: {e}")
-        import traceback
-        traceback.print_exc()
-        return redirect(url_for('listar_recibos'))
-
-@app.context_processor
-def utility_processor():
-    """Disponibiliza variáveis para todos os templates"""
-    # Não importe MODO_REAL do esocial_utils
-    # Use a função get_modo_envio()
-    return dict(modo_envio=get_modo_envio())
-
-
-# ================= CONFIGURAÇÃO DO MODO =================
-def get_modo_envio():
-    """Retorna o modo atual de envio (True=Produção, False=Teste)"""
-    from models import ConfigSistema
-    try:
-        config = ConfigSistema.query.filter_by(chave='modo_envio').first()
-        if not config:
-            config = ConfigSistema(chave='modo_envio', valor='false')
-            db.session.add(config)
-            db.session.commit()
-            return False
-        return config.valor.lower() == 'true'
-    except Exception as e:
-        print(f"Erro ao ler modo envio: {e}")
-        return False
-
-
-def set_modo_envio(modo_producao):
-    """Define o modo de envio"""
-    from models import ConfigSistema
-    try:
-        config = ConfigSistema.query.filter_by(chave='modo_envio').first()
-        if not config:
-            config = ConfigSistema(chave='modo_envio', valor='false')
-            db.session.add(config)
-
-        config.valor = 'true' if modo_producao else 'false'
-        config.atualizado_em = datetime.now()
-        db.session.commit()
-        print(f"Modo alterado para: {'PRODUÇÃO' if modo_producao else 'TESTE'}")
-    except Exception as e:
-        print(f"Erro ao salvar modo envio: {e}")
-        db.session.rollback()
-
-
-
-# Adicione estas funções no main.py (antes do utility_processor)
-
-
-
-@app.route('/toggle_modo_envio', methods=['POST'])
-@login_required
-def toggle_modo_envio():
-    """Alterna entre modo teste e produção"""
-    if current_user.tipo != 'admin':
-        flash('Apenas administradores podem alterar o modo de envio', 'danger')
-        return redirect(url_for('dashboard'))
-
-    modo_atual = get_modo_envio()
-    set_modo_envio(not modo_atual)
-
-    novo_modo = "PRODUÇÃO" if not modo_atual else "TESTE"
-    flash(f'✅ Modo de envio alterado para: {novo_modo}', 'success')
-
-    return redirect(request.referrer or url_for('dashboard'))
-@app.context_processor
-def utility_processor():
-    """Disponibiliza variáveis para todos os templates"""
-    return dict(modo_envio=get_modo_envio())
-
-
-@app.route('/minha-empresa/certificado', methods=['GET', 'POST'])
-@login_required
-def minha_empresa_certificado():
-    # Verifica se o usuário tem uma empresa
-    empresa = Empresa.query.filter_by(usuario_id=current_user.id).first()
-
-    if not empresa:
-        flash('Cadastre uma empresa primeiro.', 'warning')
-        return redirect(url_for('empresa_create'))
-
-    if request.method == 'POST':
-        # Processar upload do certificado
-        certificado_file = request.files.get('certificado')
-        senha_certificado = request.form.get('senha_certificado')
-
-        if certificado_file and senha_certificado:
-            # Salvar certificado
-            filename = secure_filename(f"cert_{empresa.id}.p12")
-            certificado_path = os.path.join('certificados', filename)
-            certificado_file.save(certificado_path)
-
-            # Salvar no banco
-            empresa.certificado_path = certificado_path
-            empresa.senha_certificado = senha_certificado
-            db.session.commit()
-
-            flash('Certificado digital enviado com sucesso!', 'success')
-            return redirect(url_for('index'))
-        else:
-            flash('Selecione o arquivo do certificado e informe a senha.', 'danger')
-
-    return render_template('minha_empresa_certificado.html', empresa=empresa)
-@app.route('/minha-empresa/certificado/remover')
-@login_required
-def remover_certificado_empresa():
-    empresa = Empresa.query.filter_by(usuario_id=current_user.id).first()
-    if empresa:
-        config = ConfigCertificado.query.filter_by(empresa_id=empresa.id).first()
-        if config:
-            # Remove o arquivo
-            if os.path.exists(config.certificado_pfx):
-                os.remove(config.certificado_pfx)
-            db.session.delete(config)
-            db.session.commit()
-            flash('✅ Certificado removido com sucesso!', 'success')
-    return redirect(url_for('meu_certificado_empresa'))
-
-#########################################################  MODELOS DE DOCUMENTOS PARA OS CLIENTES #########
-import os
-import json
-from datetime import datetime
-from werkzeug.utils import secure_filename
-from docx import Document
-from docx.shared import Inches
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
-from flask import send_file, make_response
-
-# Configuração para upload de modelos
-UPLOAD_FOLDER_MODELOS = 'modelos_documentos'
-ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc'}
-
-if not os.path.exists(UPLOAD_FOLDER_MODELOS):
-    os.makedirs(UPLOAD_FOLDER_MODELOS)
-
-
-def allowed_modelo_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-# Rotas para administrador gerenciar modelos
-@app.route('/admin/modelos')
-@login_required
-@admin_required
-def admin_modelos():
-    """Lista todos os modelos de documentos"""
-    modelos = ModeloDocumento.query.order_by(ModeloDocumento.data_criacao.desc()).all()
-    return render_template('admin/modelos_list.html', modelos=modelos)
-
-
-@app.route('/admin/modelos/novo', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def admin_modelo_novo():
-    """Criar novo modelo de documento"""
-    if request.method == 'POST':
-        nome = request.form.get('nome')
-        descricao = request.form.get('descricao')
-        tipo = request.form.get('tipo')
-        categoria = request.form.get('categoria')
-        versao = request.form.get('versao', '1.0')
-        campos_variaveis = request.form.get('campos_variaveis', '')
-
-        # Upload do arquivo PDF
-        arquivo_pdf = request.files.get('arquivo_pdf')
-        arquivo_path = None
-
-        if arquivo_pdf and allowed_modelo_file(arquivo_pdf.filename):
-            filename = secure_filename(f"modelo_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{arquivo_pdf.filename}")
-            arquivo_path = os.path.join(UPLOAD_FOLDER_MODELOS, filename)
-            arquivo_pdf.save(arquivo_path)
-
-        # Upload do arquivo Word
-        arquivo_word = request.files.get('arquivo_word')
-        arquivo_word_path = None
-
-        if arquivo_word and allowed_modelo_file(arquivo_word.filename):
-            filename = secure_filename(
-                f"modelo_word_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{arquivo_word.filename}")
-            arquivo_word_path = os.path.join(UPLOAD_FOLDER_MODELOS, filename)
-            arquivo_word.save(arquivo_word_path)
-
-        modelo = ModeloDocumento(
-            nome=nome,
-            descricao=descricao,
-            tipo=tipo,
-            categoria=categoria,
-            arquivo_path=arquivo_path,
-            arquivo_word_path=arquivo_word_path,
-            versao=versao,
-            campos_variaveis=campos_variaveis,
-            criado_por=current_user.id
-        )
-
-        db.session.add(modelo)
-        db.session.commit()
-
-        flash('Modelo de documento criado com sucesso!', 'success')
-        return redirect(url_for('admin_modelos'))
-
-    return render_template('admin/modelo_form.html', modelo=None)
-
-
-@app.route('/admin/modelos/editar/<int:id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def admin_modelo_editar(id):
-    """Editar modelo de documento"""
-    modelo = ModeloDocumento.query.get_or_404(id)
-
-    if request.method == 'POST':
-        modelo.nome = request.form.get('nome')
-        modelo.descricao = request.form.get('descricao')
-        modelo.tipo = request.form.get('tipo')
-        modelo.categoria = request.form.get('categoria')
-        modelo.versao = request.form.get('versao')
-        modelo.campos_variaveis = request.form.get('campos_variaveis')
-        modelo.ativo = request.form.get('ativo') == 'on'
-        modelo.data_atualizacao = datetime.utcnow()
-
-        # Upload novo PDF se enviado
-        arquivo_pdf = request.files.get('arquivo_pdf')
-        if arquivo_pdf and allowed_modelo_file(arquivo_pdf.filename):
-            if modelo.arquivo_path and os.path.exists(modelo.arquivo_path):
-                os.remove(modelo.arquivo_path)
-            filename = secure_filename(f"modelo_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{arquivo_pdf.filename}")
-            modelo.arquivo_path = os.path.join(UPLOAD_FOLDER_MODELOS, filename)
-            arquivo_pdf.save(modelo.arquivo_path)
-
-        # Upload novo Word se enviado
-        arquivo_word = request.files.get('arquivo_word')
-        if arquivo_word and allowed_modelo_file(arquivo_word.filename):
-            if modelo.arquivo_word_path and os.path.exists(modelo.arquivo_word_path):
-                os.remove(modelo.arquivo_word_path)
-            filename = secure_filename(
-                f"modelo_word_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{arquivo_word.filename}")
-            modelo.arquivo_word_path = os.path.join(UPLOAD_FOLDER_MODELOS, filename)
-            arquivo_word.save(modelo.arquivo_word_path)
-
-        db.session.commit()
-        flash('Modelo atualizado com sucesso!', 'success')
-        return redirect(url_for('admin_modelos'))
-
-    return render_template('admin/modelo_form.html', modelo=modelo)
-
-
-@app.route('/admin/modelos/excluir/<int:id>')
-@login_required
-@admin_required
-def admin_modelo_excluir(id):
-    """Excluir modelo de documento"""
-    modelo = ModeloDocumento.query.get_or_404(id)
-
-    # Remove arquivos físicos
-    if modelo.arquivo_path and os.path.exists(modelo.arquivo_path):
-        os.remove(modelo.arquivo_path)
-    if modelo.arquivo_word_path and os.path.exists(modelo.arquivo_word_path):
-        os.remove(modelo.arquivo_word_path)
-
-    db.session.delete(modelo)
-    db.session.commit()
-
-    flash('Modelo excluído com sucesso!', 'success')
-    return redirect(url_for('admin_modelos'))
-
-
-# Rotas para clientes baixarem documentos
-@app.route('/clientes/documentos')
-@login_required
-def clientes_documentos():
-    """Página com documentos disponíveis para download"""
-    modelos = ModeloDocumento.query.filter_by(ativo=True).order_by(ModeloDocumento.categoria,
-                                                                   ModeloDocumento.nome).all()
-
-    # Agrupar por categoria
-    categorias = {}
-    for modelo in modelos:
-        cat = modelo.categoria or 'outros'
-        if cat not in categorias:
-            categorias[cat] = []
-        categorias[cat].append(modelo)
-
-    return render_template('cliente/documentos_disponiveis.html', categorias=categorias)
-
-
-@app.route('/clientes/documentos/download/<int:modelo_id>')
-@login_required
-def cliente_download_documento(modelo_id):
-    """Download do documento pelo cliente"""
-    modelo = ModeloDocumento.query.get_or_404(modelo_id)
-
-    if not modelo.ativo:
-        flash('Documento não disponível', 'danger')
-        return redirect(url_for('clientes_documentos'))
-
-    tipo = request.args.get('tipo', 'pdf')
-
-    if tipo == 'word' and modelo.arquivo_word_path:
-        arquivo_path = modelo.arquivo_word_path
-        nome_download = f"{modelo.nome.replace(' ', '_')}.docx"
-    else:
-        arquivo_path = modelo.arquivo_path
-        nome_download = f"{modelo.nome.replace(' ', '_')}.pdf"
-
-    if not arquivo_path or not os.path.exists(arquivo_path):
-        flash('Arquivo não encontrado', 'danger')
-        return redirect(url_for('clientes_documentos'))
-
-    # Registrar download (opcional)
-    # LogDownload.create(usuario=current_user.id, documento=modelo.id)
-
-    return send_file(
-        arquivo_path,
-        as_attachment=True,
-        download_name=nome_download,
-        mimetype='application/pdf' if tipo == 'pdf' else 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    )
-
-
-@app.route('/clientes/documentos/gerar/<int:modelo_id>', methods=['POST'])
-@login_required
-def cliente_gerar_documento(modelo_id):
-    """Gerar documento personalizado com dados do cliente/funcionário"""
-    modelo = ModeloDocumento.query.get_or_404(modelo_id)
-
-    # Coletar dados do formulário para substituição
-    dados = request.form.to_dict()
-
-    # Buscar dados da empresa e funcionário
-    empresa = Empresa.query.filter_by(usuario_id=current_user.id).first()
-    funcionario_id = dados.get('funcionario_id')
-    funcionario = Funcionario.query.get(funcionario_id) if funcionario_id else None
-
-    # Substituir placeholders no documento
-    substituicoes = {
-        '[NOME_EMPRESA]': empresa.nome if empresa else '',
-        '[CNPJ]': empresa.cnpj if empresa else '',
-        '[NOME_FUNCIONARIO]': funcionario.nome if funcionario else '',
-        '[CPF]': funcionario.cpf if funcionario else '',
-        '[DATA_ATUAL]': datetime.now().strftime('%d/%m/%Y'),
-        '[HORA_ATUAL]': datetime.now().strftime('%H:%M:%S'),
-    }
-
-    # Adicionar dados personalizados
-    substituicoes.update(dados)
-
-    # Gerar PDF personalizado
-    if modelo.tipo in ['pdf', 'ambos']:
-        pdf_path = gerar_pdf_personalizado(modelo, substituicoes)
-        return send_file(pdf_path, as_attachment=True,
-                         download_name=f"documento_{datetime.now().strftime('%Y%m%d')}.pdf")
-
-    return redirect(url_for('clientes_documentos'))
-
-
-def gerar_pdf_personalizado(modelo, substituicoes):
-    """Função para gerar PDF com substituições"""
-    # Esta é uma implementação básica - você pode expandir
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.pagesizes import A4
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-
-    output_path = os.path.join(UPLOAD_FOLDER_MODELOS, f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
-
-    c = canvas.Canvas(output_path, pagesize=A4)
-    width, height = A4
-
-    # Adicionar texto com substituições
-    y = height - 50
-    for key, value in substituicoes.items():
-        c.drawString(50, y, f"{key}: {value}")
-        y -= 20
-
-    c.save()
-    return output_path
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.tipo != 'admin':
-            flash('Acesso negado. Área restrita para administradores.', 'danger')
-            return redirect(url_for('index'))
-        return f(*args, **kwargs)
-    return decorated_function
 # ================= EXECUÇÃO =================
 if __name__ == '__main__':
     with app.app_context():

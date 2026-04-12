@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">Painel Administrativo</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h5>Bem-vindo, {{ current_user.nome }}!</h5>
+                        <p>Email: {{ current_user.email }}</p>
+                        <p>Tipo de conta: <span class="badge bg-danger">Administrador</span></p>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-3">
+                            <div class="card text-white bg-info mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Empresas</h5>
+                                    <h2>{{ empresas }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-success mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Funcionários</h5>
+                                    <h2>{{ funcionarios }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-warning mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Eventos S-2220</h5>
+                                    <h2>{{ s2220 }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-danger mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Eventos S-2240</h5>
+                                    <h2>{{ s2240 }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="mt-4">
+                        <a href="{{ url_for('admin_usuarios') }}" class="btn btn-danger">
+                            <i class="bi bi-people"></i> Gerenciar Usuários
+                        </a>
+                        <a href="{{ url_for('list_empresas') }}" class="btn btn-primary">
+                            Gerenciar Empresas
+                        </a>
+                        <a href="{{ url_for('list_funcionarios') }}" class="btn btn-success">
+                            Gerenciar Funcionários
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

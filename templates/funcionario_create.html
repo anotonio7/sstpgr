@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Novo Funcionário</h2>
+<form method="POST">
+    <div class="mb-3">
+        <label>Nome</label>
+        <input type="text" name="nome" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label>CPF</label>
+        <input type="text" name="cpf" class="form-control" required placeholder="000.000.000-00">
+    </div>
+    <div class="mb-3">
+        <label>Matrícula eSocial</label>
+        <input type="text" name="matricula_esocial" class="form-control" required>
+        <small class="text-muted">Obrigatório para eventos S-2240</small>
+    </div>
+    <div class="mb-3">
+        <label>CBO (Código da Ocupação)</label>
+        <input type="text" name="cbo" class="form-control" required placeholder="Ex: 411010" pattern="\d{6}">
+        <small class="text-muted">6 dígitos. Obrigatório para S-2240.</small>
+    </div>
+    <div class="mb-3">
+        <label>Data Nascimento</label>
+        <input type="date" name="nascimento" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label>Data Admissão</label>
+        <input type="date" name="admissao" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label>Função/Cargo</label>
+        <input type="text" name="funcao" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label>Empresa</label>
+        <select name="empresa_id" class="form-select" required>
+            <option value="">Selecione</option>
+            {% for e in empresas %}
+            <option value="{{ e.id }}">{{ e.nome }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Salvar</button>
+    <a href="{{ url_for('list_funcionarios') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4><i class="bi bi-building"></i> Certificado Digital - {{ empresa.nome }}</h4>
+    </div>
+    <div class="card-body">
+
+        {% if config %}
+        <div class="alert alert-success">
+            <strong><i class="bi bi-check-circle-fill"></i> Certificado Configurado!</strong><br>
+            <small>Última atualização: {{ config.data_config.strftime('%d/%m/%Y %H:%M') }}</small><br>
+            <small>Ambiente: {% if config.ambiente == '1' %}Produção{% else %}Homologação{% endif %}</small>
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+            <strong><i class="bi bi-exclamation-triangle-fill"></i> Nenhum certificado configurado!</strong><br>
+            Você precisa configurar seu certificado digital para enviar eventos ao eSocial.
+        </div>
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label>Certificado Digital (.pfx) *</label>
+                <input type="file" name="certificado" class="form-control" accept=".pfx,.p12" required>
+                <small class="form-text text-muted">
+                    <i class="bi bi-info-circle"></i>
+                    Seu certificado digital no formato .pfx (e-CNPJ da empresa)
+                </small>
+            </div>
+
+            <div class="mb-3">
+                <label>Senha do Certificado *</label>
+                <input type="password" name="senha" class="form-control" required>
+                <small class="form-text text-muted">
+                    <i class="bi bi-lock"></i>
+                    Senha fornecida com o certificado digital
+                </small>
+            </div>
+
+            <div class="mb-3">
+                <label>Ambiente *</label>
+                <select name="ambiente" class="form-select" required>
+                    <option value="2" {% if config and config.ambiente == '2' %}selected{% endif %}>
+                        🧪 Homologação (Testes - recomendado para primeiro envio)
+                    </option>
+                    <option value="1" {% if config and config.ambiente == '1' %}selected{% endif %}>
+                        🚀 Produção (Envio real para o eSocial)
+                    </option>
+                </select>
+                <small class="form-text text-muted">
+                    <i class="bi bi-shield-check"></i>
+                    Use homologação para testar antes de enviar para produção
+                </small>
+            </div>
+
+            <div class="alert alert-info">
+                <strong><i class="bi bi-question-circle-fill"></i> Como obter seu certificado digital?</strong><br>
+                <ul class="mb-0 mt-2">
+                    <li>Adquira um certificado e-CNPJ em uma autoridade certificadora (Serasa, Certisign, Soluti)</li>
+                    <li>Solicite o certificado no formato .pfx ou .p12</li>
+                    <li>Guarde a senha em local seguro</li>
+                    <li>Faça o upload do arquivo .pfx acima</li>
+                </ul>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Salvar Certificado
+                </button>
+                {% if config %}
+                <button type="button" class="btn btn-danger" onclick="confirmarExclusao()">
+                    <i class="bi bi-trash"></i> Remover Certificado
+                </button>
+                {% endif %}
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header bg-info text-white">
+        <h5><i class="bi bi-question-circle"></i> Dúvidas sobre o certificado?</h5>
+    </div>
+    <div class="card-body">
+        <p><strong>O que é um certificado digital?</strong></p>
+        <p>É um documento eletrônico que identifica sua empresa no eSocial, garantindo a autenticidade e segurança dos dados enviados.</p>
+
+        <p><strong>Onde obter?</strong></p>
+        <p>Autoridades certificadoras como: Serasa Experian, Certisign, Soluti, Valid, etc.</p>
+
+        <p><strong>Qual o custo?</strong></p>
+        <p>O certificado e-CNPJ tem custo anual (cerca de R$ 200-500 por ano).</p>
+
+        <p><strong>Preciso de um certificado para cada empresa?</strong></p>
+        <p>Sim, cada CNPJ precisa de seu próprio certificado digital.</p>
+    </div>
+</div>
+
+<script>
+function confirmarExclusao() {
+    if(confirm('Tem certeza que deseja remover o certificado? Você precisará configurá-lo novamente para enviar eventos.')) {
+        window.location.href = "{{ url_for('remover_certificado_empresa') }}";
+    }
+}
+</script>
+{% endblock %}

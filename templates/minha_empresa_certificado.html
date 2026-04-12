@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Configurar Certificado Digital</h2>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Empresa: {{ empresa.nome }}</h5>
+            <form method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="certificado">Arquivo do Certificado (.p12 ou .pfx)</label>
+                    <input type="file" class="form-control" id="certificado" name="certificado" accept=".p12,.pfx" required>
+                </div>
+                <div class="form-group mt-3">
+                    <label for="senha_certificado">Senha do Certificado</label>
+                    <input type="password" class="form-control" id="senha_certificado" name="senha_certificado" required>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Enviar Certificado</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

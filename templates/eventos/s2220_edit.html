@@ -1,27 +1,60 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Editar Evento S-2220</h2>
-<form method="POST">
+<h2>Editar Evento S-2220 – Monitoramento da Saúde (ASO)</h2>
+<form method="POST" id="formS2220" action="{{ url_for('edit_s2220', id=evento.id) }}">
+    <!-- Dados do Funcionário -->
     <div class="mb-3">
-        <label for="funcionario_id" class="form-label">Funcionário</label>
-        <select name="funcionario_id" class="form-select" required>
+        <label>Funcionário</label>
+        <select name="funcionario_id" id="funcionario_id" class="form-select" required>
             {% for f in funcionarios %}
-            <option value="{{ f.id }}" {% if f.id == evento.funcionario_id %}selected{% endif %}>{{ f.nome }} ({{ f.cpf }})</option>
+            <option value="{{ f.id }}"
+                    data-cpf="{{ f.cpf }}"
+                    data-matricula="{{ f.matricula_esocial or '' }}"
+                    data-cbo="{{ f.cbo or '' }}"
+                    {% if f.id == evento.funcionario_id %}selected{% endif %}>
+                {{ f.nome }} (CPF: {{ f.cpf }}) - Matr: {{ f.matricula_esocial or 'NÃO INFORMADA' }} - CBO: {{ f.cbo or 'NÃO INFORMADO' }}
+            </option>
             {% endfor %}
         </select>
     </div>
 
+    <!-- Exibir dados do funcionário (readonly) -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label>CPF do Funcionário</label>
+            <input type="text" id="cpf_trab" class="form-control" readonly value="{{ evento.funcionario.cpf }}">
+        </div>
+        <div class="col-md-4">
+            <label>Matrícula eSocial</label>
+            <input type="text" id="matricula_trab" class="form-control" readonly value="{{ evento.funcionario.matricula_esocial or '' }}">
+        </div>
+        <div class="col-md-4">
+            <label>CBO</label>
+            <input type="text" id="cbo_trab" class="form-control" readonly value="{{ evento.funcionario.cbo or '' }}">
+        </div>
+    </div>
+
+    <!-- Dados do ASO -->
     <div class="mb-3">
-        <label for="data_aso" class="form-label">Data do ASO</label>
+        <label>Data do ASO</label>
         <input type="date" name="data_aso" value="{{ evento.data_aso.strftime('%Y-%m-%d') if evento.data_aso else '' }}" class="form-control" required>
     </div>
-    <div class="mb-3">
-        <label for="crm_medico" class="form-label">CRM Médico</label>
-        <input type="text" name="crm_medico" value="{{ evento.crm_medico }}" class="form-control" required>
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label>CRM do Médico</label>
+            <input type="text" name="crm_medico" value="{{ evento.crm_medico }}" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+            <label>UF do CRM</label>
+            <input type="text" name="uf_crm" value="{{ evento.uf_crm }}" class="form-control" maxlength="2" required>
+        </div>
     </div>
     <div class="mb-3">
-        <label for="uf_crm" class="form-label">UF do CRM</label>
-        <input type="text" name="uf_crm" value="{{ evento.uf_crm }}" class="form-control" maxlength="2" required>
+        <label>CPF do Médico Responsável</label>
+        <input type="text" name="cpf_medico" class="form-control" required
+               value="{{ evento.cpf_medico or '' }}"
+               placeholder="000.000.000-00" pattern="\d{3}\.\d{3}\.\d{3}-\d{2}">
+        <small class="text-muted">CPF do médico que emitiu o ASO</small>
     </div>
 
     <hr>
@@ -42,11 +75,11 @@
                     <td><input type="date" name="data_exame[]" value="{{ ex.data_exame.strftime('%Y-%m-%d') }}" class="form-control" required></td>
                     <td>
                         <input list="tiposExame" name="tipo_exame[]" value="{{ ex.tipo_exame }}" class="form-control" required>
-                    </td>
+                    </div>
                     <td><textarea name="resultado[]" class="form-control" rows="2" required>{{ ex.resultado }}</textarea></td>
                     <td class="text-center">
                         <button type="button" class="btn btn-sm btn-danger remover-linha">–</button>
-                    </td>
+                    </div>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -55,8 +88,10 @@
     <button type="button" id="adicionar_linha" class="btn btn-sm btn-primary mb-3">+ Adicionar outro exame</button>
 
     <div class="mt-3">
-        <button type="submit" class="btn btn-primary">Atualizar</button>
-        <a href="{{ url_for('list_s2220') }}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary">Atualizar e Gerar XML</button>
+        <button type="button" id="btnGerarXML" class="btn btn-secondary">Somente Gerar XML</button>
+        <button type="button" id="btnGerarPDF" class="btn btn-info">Gerar PDF</button>
+        <a href="{{ url_for('list_s2220') }}" class="btn btn-danger">Cancelar</a>
     </div>
 
     <!-- Datalist com os tipos de exame mais comuns -->
@@ -85,30 +120,97 @@
 </form>
 
 <script>
-    document.getElementById('adicionar_linha').addEventListener('click', function() {
-        const tbody = document.getElementById('corpo_exames');
-        const novaLinha = document.createElement('tr');
-        novaLinha.className = 'linha-exame';
-        novaLinha.innerHTML = `
-            <td><input type="date" name="data_exame[]" class="form-control" required></td>
-            <td>
-                <input list="tiposExame" name="tipo_exame[]" class="form-control" required>
-            </td>
-            <td><textarea name="resultado[]" class="form-control" rows="2" required></textarea></td>
-            <td class="text-center"><button type="button" class="btn btn-sm btn-danger remover-linha">–</button></td>
-        `;
-        tbody.appendChild(novaLinha);
+// Preencher campos do funcionário quando a seleção mudar
+function preencherDadosFuncionario() {
+    const select = document.getElementById('funcionario_id');
+    const selected = select.options[select.selectedIndex];
+    document.getElementById('cpf_trab').value = selected.getAttribute('data-cpf') || '';
+    document.getElementById('matricula_trab').value = selected.getAttribute('data-matricula') || '';
+    document.getElementById('cbo_trab').value = selected.getAttribute('data-cbo') || '';
+}
+document.getElementById('funcionario_id').addEventListener('change', preencherDadosFuncionario);
+preencherDadosFuncionario();
+
+// Adicionar nova linha de exame
+document.getElementById('adicionar_linha').addEventListener('click', function() {
+    const tbody = document.getElementById('corpo_exames');
+    const novaLinha = document.createElement('tr');
+    novaLinha.className = 'linha-exame';
+    novaLinha.innerHTML = `
+        <td><input type="date" name="data_exame[]" class="form-control" required></td>
+        <td>
+            <input list="tiposExame" name="tipo_exame[]" class="form-control" required>
+         </div>
+        <td><textarea name="resultado[]" class="form-control" rows="2" required></textarea></td>
+        <td class="text-center"><button type="button" class="btn btn-sm btn-danger remover-linha">–</button></td>
+    `;
+    tbody.appendChild(novaLinha);
+});
+
+// Remover linha de exame
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('remover-linha')) {
+        const linha = e.target.closest('tr');
+        if (document.querySelectorAll('.linha-exame').length > 1) {
+            linha.remove();
+        } else {
+            alert('Deve haver pelo menos um exame.');
+        }
+    }
+});
+
+// Função de envio (XML ou PDF)
+async function enviarForm(apenasGerarXml = false, gerarPdf = false) {
+    const formData = new FormData(document.getElementById('formS2220'));
+    if (apenasGerarXml) formData.append('apenas_xml', 'true');
+    if (gerarPdf) formData.append('gerar_pdf', 'true');
+
+    const response = await fetch("{{ url_for('edit_s2220', id=evento.id) }}", {
+        method: 'POST',
+        body: formData
     });
 
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('remover-linha')) {
-            const linha = e.target.closest('tr');
-            if (document.querySelectorAll('.linha-exame').length > 1) {
-                linha.remove();
-            } else {
-                alert('Deve haver pelo menos um exame.');
-            }
+    if (response.ok) {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/pdf')) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'evento_S2220.pdf';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } else if (contentType && contentType.includes('application/xml')) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'evento_S2220.xml';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
         }
-    });
+        if (!apenasGerarXml && !gerarPdf) {
+            window.location.href = "{{ url_for('list_s2220') }}";
+        }
+    } else {
+        const error = await response.text();
+        alert("Erro: " + error);
+    }
+}
+
+document.getElementById('formS2220').addEventListener('submit', (e) => {
+    e.preventDefault();
+    enviarForm(false, false);
+});
+document.getElementById('btnGerarXML').addEventListener('click', () => {
+    enviarForm(true, false);
+});
+document.getElementById('btnGerarPDF').addEventListener('click', () => {
+    enviarForm(false, true);
+});
 </script>
 {% endblock %}

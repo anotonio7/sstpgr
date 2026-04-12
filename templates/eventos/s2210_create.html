@@ -1,19 +1,158 @@
 {% extends "base.html" %}
+
 {% block content %}
-<h2>Novo Evento S-2210 (CAT)</h2>
-<form method="POST">
-    <div class="mb-3"><label>Funcionário</label><select name="funcionario_id" class="form-select" required>
-        <option value="">Selecione</option>
-        {% for f in funcionarios %}
-        <option value="{{ f.id }}">{{ f.nome }} ({{ f.cpf }})</option>
-        {% endfor %}
-    </select></div>
-    <div class="mb-3"><label>Data do Acidente</label><input type="date" name="data_acidente" class="form-control" required></div>
-    <div class="mb-3"><label>Tipo de Acidente</label><input type="text" name="tipo_acidente" class="form-control" required placeholder="típico / trajeto / doença"></div>
-    <div class="mb-3"><label>Local</label><input type="text" name="local" class="form-control"></div>
-    <div class="mb-3"><label>Parte Atingida</label><input type="text" name="parte_atingida" class="form-control"></div>
-    <div class="mb-3"><label>Descrição</label><textarea name="descricao" class="form-control" rows="3" required></textarea></div>
+<h2>Novo Evento S-2210 – Comunicação de Acidente de Trabalho (CAT)</h2>
+
+<form method="POST" id="formS2210" action="{{ url_for('processar_s2210') }}">
+    <div class="mb-3">
+        <label>Funcionário *</label>
+        <select name="funcionario_id" class="form-select" required>
+            <option value="">Selecione</option>
+            {% for f in funcionarios %}
+            <option value="{{ f.id }}"
+                    data-matricula="{{ f.matricula_esocial or '' }}"
+                    data-cbo="{{ f.cbo or '' }}">
+                {{ f.nome }} (CPF: {{ f.cpf }}) - Matr: {{ f.matricula_esocial or 'NÃO INFORMADA' }} - CBO: {{ f.cbo or 'NÃO INFORMADO' }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label>Data do Acidente *</label>
+            <input type="date" name="data_acidente" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+            <label>Hora do Acidente *</label>
+            <input type="time" name="hora_acidente" class="form-control" required>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label>Tipo de CAT *</label>
+        <select name="tipo_cat" class="form-select" required>
+            <option value="">Selecione</option>
+            <option value="1">Inicial</option>
+            <option value="2">Reabertura</option>
+            <option value="3">Comunicação de Óbito</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label>Tipo de Acidente *</label>
+        <select name="tipo_acidente" class="form-select" required>
+            <option value="">Selecione</option>
+            <option value="1">Típico</option>
+            <option value="2">Trajeto</option>
+            <option value="3">Doença do Trabalho</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label>Local do Acidente *</label>
+        <input type="text" name="local" class="form-control" required>
+    </div>
+
+    <div class="mb-3">
+        <label>Parte do Corpo Atingida *</label>
+        <input type="text" name="parte_atingida" class="form-control" required>
+    </div>
+
+    <div class="mb-3">
+        <label>Descrição do Acidente *</label>
+        <textarea name="descricao" class="form-control" rows="5" required></textarea>
+    </div>
+
+    <div class="mb-3">
+        <label>CPF do Responsável (Emitente da CAT) *</label>
+        <input type="text" name="cpf_responsavel" class="form-control" required
+               placeholder="000.000.000-00">
+    </div>
+
     <button type="submit" class="btn btn-primary">Salvar</button>
-    <a href="{{ url_for('list_s2210') }}" class="btn btn-secondary">Cancelar</a>
+    <button type="button" id="btnGerarXML" class="btn btn-secondary">Somente Gerar XML</button>
+    <a href="{{ url_for('list_s2210') }}" class="btn btn-danger">Cancelar</a>
 </form>
+
+<script>
+// Validar CPF
+function validarCPF(cpf) {
+    cpf = cpf.replace(/[^\d]/g, '');
+    if (cpf.length !== 11) return false;
+    if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+    let soma = 0;
+    for (let i = 0; i < 9; i++) {
+        soma += parseInt(cpf.charAt(i)) * (10 - i);
+    }
+    let resto = 11 - (soma % 11);
+    let digito1 = resto >= 10 ? 0 : resto;
+    if (digito1 !== parseInt(cpf.charAt(9))) return false;
+
+    soma = 0;
+    for (let i = 0; i < 10; i++) {
+        soma += parseInt(cpf.charAt(i)) * (11 - i);
+    }
+    resto = 11 - (soma % 11);
+    let digito2 = resto >= 10 ? 0 : resto;
+    return digito2 === parseInt(cpf.charAt(10));
+}
+
+// Validar CPF ao perder o foco
+document.querySelector('input[name="cpf_responsavel"]').addEventListener('blur', function() {
+    if (this.value && !validarCPF(this.value)) {
+        alert('CPF inválido! Digite um CPF válido (ex: 529.982.247-25)');
+        this.value = '';
+        this.focus();
+    }
+});
+
+// Enviar formulário
+async function enviarForm(apenasGerarXml = false) {
+    const formData = new FormData(document.getElementById('formS2210'));
+    if (apenasGerarXml) {
+        formData.append('apenas_xml', 'true');
+    }
+
+    const response = await fetch("{{ url_for('processar_s2210') }}", {
+        method: 'POST',
+        body: formData
+    });
+
+    if (response.ok) {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/xml')) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'evento_S2210.xml';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            if (!apenasGerarXml) {
+                window.location.href = "{{ url_for('list_s2210') }}";
+            }
+        } else {
+            if (!apenasGerarXml) {
+                window.location.href = "{{ url_for('list_s2210') }}";
+            }
+        }
+    } else {
+        const error = await response.text();
+        alert("Erro: " + error);
+    }
+}
+
+document.getElementById('formS2210').addEventListener('submit', (e) => {
+    e.preventDefault();
+    enviarForm(false);
+});
+
+document.getElementById('btnGerarXML').addEventListener('click', () => {
+    enviarForm(true);
+});
+</script>
 {% endblock %}
