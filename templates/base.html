@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema SST</title>
+    <title>Sistema SST - Gerenciamento de Riscos Ocupacionais</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
 </head>
@@ -28,17 +28,26 @@
             <a class="navbar-brand" href="{{ url_for('dashboard') }}">
                 <i class="bi bi-heart-pulse"></i> Sistema SST
             </a>
-            {% if current_user.is_authenticated %}
-            <div class="d-flex">
-                <span class="navbar-text text-white me-3">
-                    <i class="bi bi-person-circle"></i> {{ current_user.nome }}
-                    {% if current_user.tipo == 'admin' %}
-                        <span class="badge bg-danger">Admin</span>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item">
+                        <span class="nav-link text-white">
+                            <i class="bi bi-person-circle"></i> {{ current_user.nome }}
+                            {% if current_user.tipo == 'admin' %}
+                                <span class="badge bg-danger">Admin</span>
+                            {% endif %}
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}">Sair</a>
+                    </li>
                     {% endif %}
-                </span>
-                <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}">Sair</a>
+                </ul>
             </div>
-            {% endif %}
         </div>
     </nav>
 
@@ -52,6 +61,8 @@
                     <a href="{{ url_for('create_empresa') }}" class="list-group-item list-group-item-action">➕ Nova Empresa</a>
                     <a href="{{ url_for('list_funcionarios') }}" class="list-group-item list-group-item-action">👥 Funcionários</a>
                     <a href="{{ url_for('create_funcionario_form') }}" class="list-group-item list-group-item-action">➕ Novo Funcionário</a>
+
+                    <hr>
                     <a href="{{ url_for('list_s2220') }}" class="list-group-item list-group-item-action">📋 S-2220 (ASO)</a>
                     <a href="{{ url_for('create_s2220') }}" class="list-group-item list-group-item-action">➕ Novo ASO</a>
                     <a href="{{ url_for('list_s2221') }}" class="list-group-item list-group-item-action">🧪 S-2221 (Toxicológico)</a>
@@ -63,7 +74,6 @@
 
                     <hr>
 
-                    <!-- LINK DO CERTIFICADO PARA TODOS OS USUÁRIOS -->
                     <a href="{{ url_for('config_certificado') }}" class="list-group-item list-group-item-action">
                         <i class="bi bi-certificate"></i> 🔒 Meu Certificado Digital
                     </a>
@@ -72,26 +82,30 @@
                         <i class="bi bi-receipt"></i> 📋 Recibos e Envios
                     </a>
 
-                    <!-- Links para Documentos -->
                     <hr>
                     <a href="{{ url_for('clientes_documentos') }}" class="list-group-item list-group-item-action">
                         <i class="bi bi-download"></i> 📄 Documentos para Download
                     </a>
+                    <a href="{{ url_for('listar_clientes') }}" class="list-group-item list-group-item-action">
+                        <i class="bi bi-people"></i> 👥 Clientes
+                    </a>
+                    <a href="{{ url_for('listar_avaliacoes') }}" class="list-group-item list-group-item-action">
+                        <i class="bi bi-clipboard-check"></i> 📋 Avaliações Psicossociais
+                    </a>
 
                     {% if current_user.tipo == 'admin' %}
+                    <hr>
                     <a href="{{ url_for('admin_modelos') }}" class="list-group-item list-group-item-action">
                         <i class="bi bi-folder-plus"></i> 📁 Gerenciar Modelos
                     </a>
                     {% endif %}
 
-                    <!-- BOTÃO TIRA DÚVIDA - ADICIONADO AQUI -->
                     <hr>
                     <button type="button" class="list-group-item list-group-item-action bg-info text-white"
                             data-bs-toggle="modal" data-bs-target="#modalDuvidas">
                         <i class="bi bi-question-circle-fill"></i> ❓ Tira Dúvidas
                     </button>
 
-                    <!-- BOTÃO PARA ALTERNAR MODO - SÓ APARECE PARA ADMIN -->
                     {% if current_user.tipo == 'admin' %}
                     <hr>
                     <form method="POST" action="{{ url_for('toggle_modo_envio') }}">
@@ -107,7 +121,6 @@
                         </button>
                     </form>
                     <a href="{{ url_for('admin_usuarios') }}" class="list-group-item list-group-item-action bg-danger text-white">👑 Gerenciar Usuários</a>
-                    <a href="{{ url_for('config_certificado') }}" class="list-group-item list-group-item-action">🔒 Certificado Digital (Admin)</a>
                     <a href="{{ url_for('enviar_xml_manual') }}" class="list-group-item list-group-item-action">📤 Enviar XML Manual</a>
                     <a href="{{ url_for('debug_respostas') }}" class="list-group-item list-group-item-action bg-warning text-dark">🐛 Debug eSocial</a>
                     {% endif %}
@@ -122,9 +135,9 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show" role="alert">
                         {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 {% endfor %}
             {% endif %}
@@ -157,33 +170,25 @@
                         <h5 class="mt-3">Precisa de ajuda?</h5>
 
                         <div class="mt-4">
-                            <p><strong>📞 Telefone:</strong> (xx) xxxxx-xxxx</p>
+                            <p><strong>📞 Telefone:</strong> (73) 99977-3814</p>
                             <p><strong>📧 E-mail:</strong> sstergonomia2@gmail.com</p>
-                            <p><strong>💬 WhatsApp:</strong> (73) 99977-3814 "Marcos"</p>
+                            <p><strong>💬 WhatsApp:</strong> (73) 99977-3814</p>
+                            <p><strong>💰 Pix:</strong> Antonio Marcos - Contribuição de R$ 30,00</p>
                         </div>
 
                         <hr>
 
-                        <div class="mt-3">
+                        <div class="mt-3 text-start">
                             <h6>📚 Perguntas Frequentes:</h6>
-                            <p class="text-start">
-                                <strong>• Como enviar eventos?</strong><br>
-                                Cadastre empresa e funcionários, depois acesse o evento desejado.
-                            </p>
-                            <p class="text-start">
-                                <strong>• Como configurar certificado?</strong><br>
-                                Acesse "Meu Certificado Digital" no menu e faça o upload.
-                            </p>
-                            <p class="text-start">
-                                <strong>• Diferença entre TESTE e PRODUÇÃO?</strong><br>
-                                Modo TESTE não envia para o eSocial real. PRODUÇÃO envia com certificado.
-                            </p>
+                            <p><strong>• Como enviar eventos?</strong><br>Cadastre empresa e funcionários, depois acesse o evento desejado.</p>
+                            <p><strong>• Como configurar certificado?</strong><br>Acesse "Meu Certificado Digital" no menu e faça o upload.</p>
+                            <p><strong>• Diferença entre TESTE e PRODUÇÃO?</strong><br>Modo TESTE não envia para o eSocial real. PRODUÇÃO envia com certificado.</p>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    <a href="https://wa.me/5511999999999" class="btn btn-success" target="_blank">
+                    <a href="https://wa.me/5573999773814" class="btn btn-success" target="_blank">
                         <i class="bi bi-whatsapp"></i> Falar no WhatsApp
                     </a>
                 </div>

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h4><i class="bi bi-file-text"></i> Resultado da Avaliação Psicossocial</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Dados do Funcionário</h5>
+                    <table class="table table-bordered">
+                        <tr><th>Nome</th><td>{{ avaliacao.nome_funcionario }}</td></tr>
+                        <tr><th>Email</th><td>{{ avaliacao.email_funcionario or '-' }}</td></tr>
+                        <tr><th>Cargo</th><td>{{ avaliacao.cargo }}</td></tr>
+                        <tr><th>Setor</th><td>{{ avaliacao.setor }}</td></tr>
+                        <tr><th>Data da Resposta</th><td>{{ avaliacao.data_resposta.strftime('%d/%m/%Y %H:%M') if avaliacao.data_resposta else '-' }}</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h5>Resultado</h5>
+                    <table class="table table-bordered">
+                        <tr><th>Pontuação Total</th>
+                            <td class="text-center">
+                                <span class="badge bg-primary fs-4">{{ avaliacao.pontuacao_total }}</span>
+                            </td>
+                        </tr>
+                        <tr><th>Nível de Risco</th>
+                            <td class="text-center">
+                                {% if avaliacao.nivel_risco == 'Baixo' %}
+                                    <span class="badge bg-success fs-5">BAIXO</span>
+                                {% elif avaliacao.nivel_risco == 'Médio' %}
+                                    <span class="badge bg-warning fs-5">MÉDIO</span>
+                                {% elif avaliacao.nivel_risco == 'Alto' %}
+                                    <span class="badge bg-danger fs-5">ALTO</span>
+                                {% else %}
+                                    <span class="badge bg-dark fs-5">CRÍTICO</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <a href="{{ url_for('gerar_pdf_resultado', id=avaliacao.id) }}" class="btn btn-danger" target="_blank">
+                    <i class="bi bi-file-pdf"></i> Baixar PDF
+                </a>
+                <a href="{{ url_for('listar_avaliacoes') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

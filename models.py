@@ -52,8 +52,8 @@ class Funcionario(db.Model):
     cpf = db.Column(db.String(20), nullable=False, unique=True)
     matricula_esocial = db.Column(db.String(50), nullable=False)
     cbo = db.Column(db.String(6), nullable=False)
-    nascimento = db.Column(db.Date)
-    admissao = db.Column(db.Date)
+    nascimento = db.Column(db.String(10))  # Mudar de db.Date para db.String
+    admissao = db.Column(db.String(10))  # Mudar de db.Date para db.String
     funcao = db.Column(db.String(100))
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'))
 
@@ -212,3 +212,38 @@ class ModeloDocumento(db.Model):
 
     def __repr__(self):
         return f'<ModeloDocumento {self.nome}>'
+
+
+# Adicione ao models.py
+class Cliente(db.Model):
+    __tablename__ = 'clientes'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(200), nullable=False, unique=True)
+    empresa = db.Column(db.String(200))
+    telefone = db.Column(db.String(20))
+    data_cadastro = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # NÃO adicione 'avaliacoes' aqui, pois já está no outro modelo
+
+
+class AvaliacaoPsicossocial(db.Model):
+    __tablename__ = 'avaliacoes_psicossociais'
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
+    token = db.Column(db.String(100), unique=True, nullable=False)
+    email_enviado = db.Column(db.Boolean, default=False)
+    data_envio = db.Column(db.DateTime)
+    data_resposta = db.Column(db.DateTime)
+    status = db.Column(db.String(20), default='pendente')
+    respostas = db.Column(db.Text)
+    nome_funcionario = db.Column(db.String(200))
+    cargo = db.Column(db.String(200))
+    setor = db.Column(db.String(200))
+    email_funcionario = db.Column(db.String(200))
+    pontuacao_total = db.Column(db.Integer)
+    nivel_risco = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # CORREÇÃO: Remova o backref duplicado
+    cliente = db.relationship('Cliente', backref='avaliacoes_psicossociais')  # ← nome único

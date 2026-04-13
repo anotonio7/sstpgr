@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white text-center">
+                    <h4><i class="bi bi-whatsapp"></i> Compartilhar Link da Avaliação</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Informações do Funcionário -->
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Funcionário:</strong> {{ avaliacao.nome_funcionario }}<br>
+                        <strong>Cargo:</strong> {{ avaliacao.cargo }} | <strong>Setor:</strong> {{ avaliacao.setor }}
+                    </div>
+
+                    <!-- MÉTODO 1: BOTÃO DO WHATSAPP (RECOMENDADO) -->
+                    <div class="mb-4 p-3 border rounded bg-light">
+                        <h5><i class="bi bi-whatsapp text-success"></i> Método 1: Enviar pelo WhatsApp</h5>
+                        <p class="text-muted">Clique no botão abaixo, escolha o contato e envie. O link aparecerá em <strong class="text-primary">azul e clicável</strong>.</p>
+                        <div class="text-center">
+                            <a href="https://api.whatsapp.com/send?text=📋 *AVALIAÇÃO PSICOSSOCIAL*%0A%0AOlá! Clique no link abaixo para responder o questionário:%0A%0A{{ link | urlencode }}%0A%0A⏱️ O link é único e válido para uma única resposta.%0A📱 Qualquer dúvida, entre em contato com o RH."
+                               target="_blank"
+                               class="btn btn-success btn-lg w-100">
+                                <i class="bi bi-whatsapp"></i> Enviar pelo WhatsApp
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- MÉTODO 2: QR CODE -->
+                    {% if qr_code %}
+                    <div class="mb-4 p-3 border rounded bg-light">
+                        <h5><i class="bi bi-qr-code"></i> Método 2: Escanear QR Code</h5>
+                        <p class="text-muted">O funcionário abre a câmera do celular e escaneia o código abaixo.</p>
+                        <div class="text-center">
+                            <img src="{{ qr_code }}" alt="QR Code" style="max-width: 200px;" class="img-fluid border p-2 rounded bg-white">
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- MÉTODO 3: COPIAR LINK MANUALMENTE -->
+                    <div class="mb-4 p-3 border rounded bg-light">
+                        <h5><i class="bi bi-clipboard"></i> Método 3: Copiar link manualmente</h5>
+                        <p class="text-muted">Copie o link abaixo e cole no WhatsApp ou email do funcionário.</p>
+                        <div class="input-group mb-2">
+                            <input type="text" id="linkInput" class="form-control" value="{{ link }}" readonly>
+                            <button class="btn btn-primary" onclick="copiarLink()">
+                                <i class="bi bi-clipboard"></i> Copiar
+                            </button>
+                        </div>
+                        <div class="input-group">
+                            <input type="text" id="mensagemInput" class="form-control" value="Olá! Clique no link abaixo para responder a avaliação psicossocial: {{ link }}" readonly>
+                            <button class="btn btn-success" onclick="copiarMensagem()">
+                                <i class="bi bi-chat-text"></i> Copiar Mensagem
+                            </button>
+                        </div>
+                        <small class="text-muted d-block mt-2">
+                            💡 <strong>Dica:</strong> Após colar no WhatsApp, o link ficará <span class="text-primary">azul e clicável</span>.
+                        </small>
+                    </div>
+
+                    <!-- MÉTODO 4: LINK CURTO -->
+                    <div class="mb-4 p-3 border rounded bg-light">
+                        <h5><i class="bi bi-link"></i> Método 4: Link Curto</h5>
+                        <p class="text-muted">Use este link mais curto para enviar por SMS ou outras plataformas.</p>
+                        <div class="input-group">
+                            <input type="text" id="shortLinkInput" class="form-control" value="{{ url_for('avaliacao_short', token=avaliacao.token, _external=True) }}" readonly>
+                            <button class="btn btn-primary" onclick="copiarShortLink()">
+                                <i class="bi bi-clipboard"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AVISO IMPORTANTE -->
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Importante:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Este link é <strong>único e válido para uma única resposta</strong></li>
+                            <li>Após o funcionário responder, o link <strong>não funcionará novamente</strong></li>
+                            <li>O funcionário pode responder <strong>pelo celular ou computador</strong></li>
+                            <li>Os resultados ficam disponíveis na listagem de avaliações</li>
+                        </ul>
+                    </div>
+
+                    <!-- BOTÕES DE NAVEGAÇÃO -->
+                    <div class="d-flex justify-content-center gap-2 mt-3">
+                        <a href="{{ url_for('listar_avaliacoes') }}" class="btn btn-secondary">
+                            <i class="bi bi-list"></i> Ver Todas Avaliações
+                        </a>
+                        <a href="{{ url_for('nova_avaliacao', cliente_id=avaliacao.cliente_id) }}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Nova Avaliação
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copiarLink() {
+    var linkInput = document.getElementById('linkInput');
+    linkInput.select();
+    linkInput.setSelectionRange(0, 99999);
+    document.execCommand('copy');
+
+    // Feedback visual
+    var btn = event.target.closest('button');
+    var originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check"></i> Link copiado!';
+    setTimeout(function() {
+        btn.innerHTML = originalText;
+    }, 2000);
+}
+
+function copiarMensagem() {
+    var msgInput = document.getElementById('mensagemInput');
+    msgInput.select();
+    msgInput.setSelectionRange(0, 99999);
+    document.execCommand('copy');
+
+    var btn = event.target.closest('button');
+    var originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check"></i> Mensagem copiada!';
+    setTimeout(function() {
+        btn.innerHTML = originalText;
+    }, 2000);
+}
+
+function copiarShortLink() {
+    var shortInput = document.getElementById('shortLinkInput');
+    shortInput.select();
+    shortInput.setSelectionRange(0, 99999);
+    document.execCommand('copy');
+
+    var btn = event.target.closest('button');
+    var originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check"></i> Link curto copiado!';
+    setTimeout(function() {
+        btn.innerHTML = originalText;
+    }, 2000);
+}
+</script>
+{% endblock %}

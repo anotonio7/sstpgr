@@ -1,0 +1,114 @@
+@'
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h4>
+                <i class="bi bi-receipt"></i> Detalhes do Recibo - {{ recibo.evento_tipo }}
+                <a href="{{ url_for('recibo_pdf', id=recibo.id) }}" class="btn btn-light float-end" target="_blank">
+                    <i class="bi bi-file-pdf"></i> Gerar PDF
+                </a>
+            </h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Informações do Recibo</h5>
+                    <table class="table table-bordered">
+                        <tr>
+                            <th>ID do Recibo</th>
+                            <td>{{ recibo.id }}</td>
+                        </tr>
+                        <tr>
+                            <th>Tipo de Evento</th>
+                            <td>{{ recibo.evento_tipo }}</td>
+                        </tr>
+                        <tr>
+                            <th>ID do Evento</th>
+                            <td>{{ recibo.evento_id }}</td>
+                        </tr>
+                        <tr>
+                            <th>Data de Envio</th>
+                            <td>{{ recibo.data_envio.strftime('%d/%m/%Y %H:%M:%S') if recibo.data_envio else 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Status</th>
+                            <td>
+                                {% if recibo.status == 'enviado' %}
+                                    <span class="badge bg-success">✓ Enviado com Sucesso</span>
+                                {% else %}
+                                    <span class="badge bg-danger">✗ Erro no Envio</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="col-md-6">
+                    <h5>Informações do Funcionário</h5>
+                    <table class="table table-bordered">
+                        <tr>
+                            <th>Nome</th>
+                            <td>{{ evento.funcionario.nome if evento and evento.funcionario else 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <th>CPF</th>
+                            <td>{{ evento.funcionario.cpf if evento and evento.funcionario else 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Empresa</th>
+                            <td>{{ evento.funcionario.empresa.nome if evento and evento.funcionario and evento.funcionario.empresa else 'N/A' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h5>Protocolo / Recibo</h5>
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <pre class="mb-0" style="white-space: pre-wrap;">{{ recibo.recibo if recibo.recibo else 'N/A' }}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h5>Arquivo XML</h5>
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <code>{{ recibo.nome_xml if recibo.nome_xml else 'N/A' }}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if recibo.mensagem_erro %}
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="alert alert-danger">
+                        <strong>Erro:</strong> {{ recibo.mensagem_erro }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="row mt-4">
+                <div class="col-12 text-center">
+                    <a href="{{ url_for('listar_recibos') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Voltar
+                    </a>
+                    <a href="{{ url_for('recibo_pdf', id=recibo.id) }}" class="btn btn-danger" target="_blank">
+                        <i class="bi bi-file-pdf"></i> Baixar PDF
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+'@ | Out-File -FilePath "C:\Users\DESKTOP\sstpgr\templates\recibos_detalhe.html" -Encoding UTF8

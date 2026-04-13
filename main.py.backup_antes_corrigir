@@ -1,115 +1,54 @@
-# ================= IMPORTAÇÕES PADRÃO =================
 import os
-import re
-import json
-import secrets
-import hashlib
-import sqlite3
-from datetime import datetime, timedelta
-from io import BytesIO
-from functools import wraps
-
-# ================= IMPORTAÇÕES FLASK =================
-from flask import Flask, send_file, session, request, flash, redirect, url_for, render_template, Response, make_response
-
-# ================= IMPORTAÇÕES FLASK-LOGIN =================
+from flask import Flask, send_file, session, request, flash, redirect, url_for, render_template, Response
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
-
-# ================= IMPORTAÇÕES SQLALCHEMY =================
-from sqlalchemy.exc import IntegrityError
-
-# ================= IMPORTAÇÕES WERKZEUG =================
 from werkzeug.utils import secure_filename
+from functools import wraps
+import sqlite3
+import hashlib
+import secrets
+from sqlalchemy.exc import IntegrityError  # Adicione esta linha
+from datetime import datetime  # Adicione esta linha
+import re
+from datetime import datetime, timedelta
 
-# ================= IMPORTAÇÕES REPORTLAB =================
+from io import BytesIO
+from models import S2220Exame
+
+from esocial_utils import (
+    carregar_certificado, assinar_xml, gerar_xml_s2220, gerar_xml_s2221,
+    gerar_xml_s2210, gerar_xml_s2240, enviar_lote
+)
+
+from models import Empresa, Funcionario, EventoS2220, S2220Exame, EventoS2221, EventoS2210, EventoS2240, RiscoS2240, \
+    ConfigCertificado, Usuario
+from flask import Flask
+from models import db
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
-# Topo do arquivo main.py
-from datetime import datetime  # ← Se tiver aqui, não precisa dentro da função
-# ================= IMPORTAÇÕES DOCX =================
-from docx import Document
-from docx.shared import Inches
-from models import Cliente, AvaliacaoPsicossocial
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from datetime import datetime, timedelta
-import hashlib
-import secrets
-from flask_mail import Mail, Message  # ← ADICIONE ESTA LINHA
-
-# ... resto das importações
-# ================= IMPORTAÇÕES DOS MODELOS =================
+from models import Empresa, Funcionario, EventoS2220, S2220Exame, EventoS2221, EventoS2210, EventoS2240, RiscoS2240, \
+    ConfigCertificado, Usuario, ConfigSistema  # Adicione ConfigSistema aqui
+import os
+from werkzeug.utils import secure_filename
+# No topo do main.py, adicione:
+# Em vez de:
+# CORRETO (use Usuario):
 from models import (
     db,
-    Usuario,
+    Usuario,   # ✅ Correto
     Empresa,
     Funcionario,
     EventoS2220,
-    S2220Exame,
     EventoS2221,
     EventoS2210,
     EventoS2240,
-    RiscoS2240,
-    ConfigCertificado,
-    ConfigSistema,
-    ModeloDocumento,
-    ReciboEnvio
+    ModeloDocumento
 )
+# Use:
+from models import *
 
-# ================= IMPORTAÇÕES UTILITÁRIOS =================
-from esocial_utils import (
-    carregar_certificado,
-    assinar_xml,
-    gerar_xml_s2220,
-    gerar_xml_s2221,
-    gerar_xml_s2210,
-    gerar_xml_s2240,
-    enviar_lote
-)
-
-# ================= INICIALIZAÇÃO DO FLASK =================
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'sua-chave-secreta-aqui'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Inicializar banco de dados
-db.init_app(app)
-
-# ================= CONFIGURAÇÃO DO LOGIN =================
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-@login_manager.user_loader
-def load_user(user_id):
-    return db.session.get(Usuario, int(user_id))
-
-# ================= FUNÇÕES AUXILIARES =================
-def validar_cpf(cpf):
-    """Valida CPF"""
-    if not cpf:
-        return False
-    cpf = ''.join(filter(str.isdigit, cpf))
-    if len(cpf) != 11:
-        return False
-    return True
-
-# ================= FUNÇÃO PARA GERAR PDF DO S-2220 =================
-def gerar_pdf_s2220(evento):
-    """Gera PDF do ASO (S-2220) - Com assinatura do funcionário"""
-    # Coloque aqui a função completa que criamos anteriormente
-    # ... (código completo da função gerar_pdf_s2220)
-    pass  # Substitua pelo código completo
-
-# ================= ROTAS DO SISTEMA =================
-# Suas rotas aqui...
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'chave-secreta-mude-em-producao-123456'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sst2.db'
@@ -122,44 +61,12 @@ db.init_app(app)
 # Configuração de email (para recuperação de senha)
 # Configuração de email (para recuperação de senha)
 # Configuração de email (para recuperação de senha)
-# ==================== CONFIGURAÇÃO DE EMAIL ====================
-# ==================== CONFIGURAÇÃO DE EMAIL ====================
 EMAIL_CONFIG = {
     'smtp_server': 'smtp.gmail.com',
     'smtp_port': 587,
-    'email': 'meusistema@gmail.com',  # Altere para seu email
+    'email': 'meusistema@gmail.com',
     'senha': 'abcd efgh ijkl mnop'  # Senha de app de 16 caracteres
 }
-
-app.config['MAIL_SERVER'] = EMAIL_CONFIG['smtp_server']
-app.config['MAIL_PORT'] = EMAIL_CONFIG['smtp_port']
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = EMAIL_CONFIG['email']
-app.config['MAIL_PASSWORD'] = EMAIL_CONFIG['senha']
-app.config['MAIL_DEFAULT_SENDER'] = EMAIL_CONFIG['email']
-
-mail = Mail(app)  # Agora o 'Mail' está definido
-
-
-def enviar_email_avaliacao(cliente, avaliacao):
-    link = url_for('responder_avaliacao', token=avaliacao.token, _external=True)
-
-    # MODO TESTE - Só exibe no console
-    print("\n" + "=" * 60)
-    print("🔵 MODO TESTE - Email não enviado")
-    print("=" * 60)
-    print(f"Para: {cliente.email}")
-    print(f"Assunto: Avaliação Psicossocial - {avaliacao.nome_funcionario}")
-    print(f"\n🔗 LINK DE ACESSO:")
-    print(f"{link}")
-    print("=" * 60 + "\n")
-
-    # Simula envio
-    avaliacao.email_enviado = True
-    avaliacao.data_envio = datetime.now()
-    db.session.commit()
-
-    return True
 # ================= LOGIN MANAGER =================
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
@@ -1035,9 +942,19 @@ def download_xml_s2220(id):
         evento = EventoS2220.query.get_or_404(id)
         funcionario = evento.funcionario
         empresa = funcionario.empresa
+
+        # Gerar XML na hora (mesma lógica da view_xml)
         xml_str = gerar_xml_s2220(evento, empresa, funcionario, ambiente='2')
+
+        # Criar buffer para download
         buffer = BytesIO(xml_str.encode('utf-8'))
-        return send_file(buffer, as_attachment=True, download_name=f's2220_{evento.id}.xml', mimetype='application/xml')
+
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f's2220_{evento.id}.xml',
+            mimetype='application/xml'
+        )
     except Exception as e:
         flash(f'Erro ao gerar XML: {str(e)}', 'error')
         return redirect(url_for('list_s2220'))
@@ -1049,6 +966,13 @@ def view_xml_s2220(id):
     empresa = funcionario.empresa
     xml_str = gerar_xml_s2220(evento, empresa, funcionario, ambiente='2')
     return Response(xml_str, mimetype='application/xml')
+
+@app.route('/s2220/download_pdf/<int:id>')
+@login_required
+def download_pdf_s2220(id):
+    evento = EventoS2220.query.get_or_404(id)
+    pdf_buffer = gerar_pdf_s2220(evento)
+    return send_file(pdf_buffer, as_attachment=True, download_name=f'S2220_{evento.id}.pdf', mimetype='application/pdf')
 
 
 @app.route('/s2220/send/<int:id>')
@@ -1077,373 +1001,6 @@ def send_s2220(id):
         flash(f'Erro ao enviar: {str(e)}', 'danger')
     return redirect(url_for('list_s2220'))
 
-
-@app.route('/s2220/teste_xml/<int:id>')
-@login_required
-def teste_xml_s2220(id):
-    """Rota para testar a geração do XML e ver erros"""
-    import traceback
-    from io import BytesIO
-
-    try:
-        evento = db.session.get(EventoS2220, id)
-        if not evento:
-            return "Evento não encontrado", 404
-
-        funcionario = evento.funcionario
-        empresa = funcionario.empresa
-
-        # Verificar dados obrigatórios
-        erros = []
-        if not empresa.cnpj:
-            erros.append("Empresa sem CNPJ")
-        if not funcionario.matricula_esocial:
-            erros.append("Funcionário sem matrícula eSocial")
-        if not funcionario.cpf:
-            erros.append("Funcionário sem CPF")
-        if not funcionario.cbo:
-            erros.append("Funcionário sem CBO")
-        if not evento.crm_medico:
-            erros.append("Evento sem CRM médico")
-        if not evento.cpf_medico:
-            erros.append("Evento sem CPF do médico")
-
-        if erros:
-            return f"Erros encontrados:<br>{'<br>'.join(erros)}"
-
-        # Tentar gerar o XML
-        xml_str = gerar_xml_s2220(evento, empresa, funcionario, ambiente='2')
-
-        if not xml_str:
-            return "XML gerado está vazio"
-
-        # Mostrar as primeiras 500 linhas do XML
-        linhas = xml_str.split('\n')[:50]
-        return f"""
-        <h3>XML Gerado com Sucesso!</h3>
-        <pre>{'<br>'.join(linhas)}</pre>
-        <p>Total de caracteres: {len(xml_str)}</p>
-        <a href="{url_for('download_xml_s2220', id=id)}">Clique aqui para baixar</a>
-        """
-
-    except Exception as e:
-        return f"""
-        <h3>Erro ao gerar XML:</h3>
-        <pre>{str(e)}</pre>
-        <pre>{traceback.format_exc()}</pre>
-        """
-########################################################## GERAR PDF PARA O ASO #############################
-@app.route('/s2220/download_pdf/<int:id>')
-@login_required
-def download_pdf_s2220(id):
-    try:
-        evento = db.session.get(EventoS2220, id)
-        if not evento:
-            flash('Evento não encontrado', 'error')
-            return redirect(url_for('list_s2220'))
-
-        pdf_buffer = gerar_pdf_s2220(evento)
-
-        return send_file(
-            pdf_buffer,
-            as_attachment=True,
-            download_name=f'S2220_{evento.id}.pdf',
-            mimetype='application/pdf'
-        )
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        flash(f'Erro ao gerar PDF: {str(e)}', 'error')
-        return redirect(url_for('list_s2220'))
-
-
-def gerar_pdf_s2220(evento):
-    """Gera PDF do ASO (S-2220) - Com assinatura do funcionário"""
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import cm
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-    from io import BytesIO
-    from datetime import datetime
-
-    buffer = BytesIO()
-
-    # Configuração da página
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        topMargin=2 * cm,
-        bottomMargin=2 * cm,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm
-    )
-
-    # Função para desenhar bordas pretas
-    def bordas_pretas(canvas, doc):
-        canvas.saveState()
-        canvas.setStrokeColor(colors.black)
-        canvas.setLineWidth(1.5)
-        canvas.rect(
-            1.2 * cm, 1.2 * cm,
-            A4[0] - 2.4 * cm,
-            A4[1] - 2.4 * cm,
-        )
-        canvas.restoreState()
-
-    styles = getSampleStyleSheet()
-
-    # Estilos profissionais
-    estilo_titulo_principal = ParagraphStyle(
-        'TituloPrincipal',
-        parent=styles['Title'],
-        fontSize=13,
-        alignment=TA_CENTER,
-        spaceAfter=4,
-        spaceBefore=2,
-        textColor=colors.black,
-        fontName='Helvetica-Bold'
-    )
-
-    estilo_subtitulo = ParagraphStyle(
-        'Subtitulo',
-        parent=styles['Normal'],
-        fontSize=10,
-        alignment=TA_CENTER,
-        spaceAfter=8,
-        textColor=colors.black,
-        fontName='Helvetica'
-    )
-
-    estilo_secao = ParagraphStyle(
-        'Secao',
-        parent=styles['Normal'],
-        fontSize=10,
-        alignment=TA_LEFT,
-        spaceAfter=5,
-        spaceBefore=5,
-        textColor=colors.black,
-        fontName='Helvetica-Bold'
-    )
-
-    estilo_campo = ParagraphStyle(
-        'Campo',
-        parent=styles['Normal'],
-        fontSize=9,
-        alignment=TA_LEFT,
-        textColor=colors.black,
-        fontName='Helvetica-Bold'
-    )
-
-    estilo_valor = ParagraphStyle(
-        'Valor',
-        parent=styles['Normal'],
-        fontSize=9,
-        alignment=TA_LEFT,
-        textColor=colors.black,
-        fontName='Helvetica'
-    )
-
-    story = []
-
-    func = evento.funcionario
-    empresa = func.empresa
-
-    # Função formatar data
-    def formatar_data(valor):
-        if not valor:
-            return ""
-        if hasattr(valor, 'strftime'):
-            return valor.strftime('%d/%m/%Y')
-        if isinstance(valor, str):
-            for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%Y%m%d']:
-                try:
-                    data_obj = datetime.strptime(valor, fmt)
-                    return data_obj.strftime('%d/%m/%Y')
-                except:
-                    continue
-            return valor
-        return str(valor)
-
-    # ================= CABEÇALHO =================
-    story.append(Paragraph("MINISTÉRIO DO TRABALHO E EMPREGO", estilo_titulo_principal))
-    story.append(Paragraph("Programa de Controle Médico de Saúde Ocupacional", estilo_subtitulo))
-    story.append(Paragraph("ATESTADO DE SAÚDE OCUPACIONAL - ASO", estilo_titulo_principal))
-    story.append(Spacer(1, 0.3 * cm))
-
-    # ================= 1. IDENTIFICAÇÃO DA EMPRESA =================
-    story.append(Paragraph("1. IDENTIFICAÇÃO DA EMPRESA", estilo_secao))
-
-    dados_empresa = [
-        [Paragraph("<b>Razão Social:</b>", estilo_campo), Paragraph(empresa.nome or "", estilo_valor)],
-        [Paragraph("<b>CNPJ:</b>", estilo_campo), Paragraph(empresa.cnpj or "", estilo_valor)],
-        [Paragraph("<b>Endereço:</b>", estilo_campo),
-         Paragraph(f"{empresa.rua or ''}, {empresa.bairro or ''} - {empresa.cidade or ''}/{empresa.estado or ''}",
-                   estilo_valor)],
-    ]
-
-    tabela_empresa = Table(dados_empresa, colWidths=[3.2 * cm, 11.3 * cm])
-    tabela_empresa.setStyle(TableStyle([
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    story.append(tabela_empresa)
-    story.append(Spacer(1, 0.2 * cm))
-
-    # ================= 2. DADOS DO TRABALHADOR =================
-    story.append(Paragraph("2. DADOS DO TRABALHADOR", estilo_secao))
-
-    nascimento_str = formatar_data(func.nascimento)
-    admissao_str = formatar_data(func.admissao)
-
-    dados_trabalhador = [
-        [Paragraph("<b>Nome:</b>", estilo_campo), Paragraph(func.nome or "", estilo_valor),
-         Paragraph("<b>CPF:</b>", estilo_campo), Paragraph(func.cpf or "", estilo_valor)],
-        [Paragraph("<b>Matrícula eSocial:</b>", estilo_campo),
-         Paragraph(func.matricula_esocial or "NÃO INFORMADA", estilo_valor),
-         Paragraph("<b>Nascimento:</b>", estilo_campo), Paragraph(nascimento_str, estilo_valor)],
-        [Paragraph("<b>Admissão:</b>", estilo_campo), Paragraph(admissao_str, estilo_valor),
-         Paragraph("<b>CBO:</b>", estilo_campo), Paragraph(func.cbo or "", estilo_valor)],
-        [Paragraph("<b>Função:</b>", estilo_campo), Paragraph(func.funcao or "", estilo_valor),
-         Paragraph("", estilo_campo), Paragraph("", estilo_valor)],
-    ]
-
-    tabela_trabalhador = Table(dados_trabalhador, colWidths=[3 * cm, 3.8 * cm, 2.5 * cm, 5.2 * cm])
-    tabela_trabalhador.setStyle(TableStyle([
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    story.append(tabela_trabalhador)
-    story.append(Spacer(1, 0.2 * cm))
-
-    # ================= 3. INFORMAÇÕES DO ASO =================
-    story.append(Paragraph("3. INFORMAÇÕES DO ASO", estilo_secao))
-
-    data_aso_str = formatar_data(evento.data_aso)
-
-    dados_aso = [
-        [Paragraph("<b>Data do ASO:</b>", estilo_campo), Paragraph(data_aso_str, estilo_valor),
-         Paragraph("<b>CRM Médico:</b>", estilo_campo),
-         Paragraph(f"{evento.crm_medico}/{evento.uf_crm}" if evento.crm_medico else "", estilo_valor)],
-        [Paragraph("<b>CPF do Médico:</b>", estilo_campo),
-         Paragraph(evento.cpf_medico or "Não informado", estilo_valor),
-         Paragraph("", estilo_campo), Paragraph("", estilo_valor)],
-    ]
-
-    tabela_aso = Table(dados_aso, colWidths=[3 * cm, 3.8 * cm, 2.5 * cm, 5.2 * cm])
-    tabela_aso.setStyle(TableStyle([
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    story.append(tabela_aso)
-    story.append(Spacer(1, 0.2 * cm))
-
-    # ================= 4. EXAMES REALIZADOS =================
-    if evento.exames and len(evento.exames) > 0:
-        story.append(Paragraph("4. EXAMES REALIZADOS", estilo_secao))
-
-        dados_exames = [["DATA", "TIPO DE EXAME", "RESULTADO"]]
-
-        for exame in evento.exames[:4]:
-            dados_exames.append([
-                formatar_data(exame.data_exame),
-                exame.tipo_exame or '',
-                (exame.resultado[:35] + '...') if len(exame.resultado or '') > 35 else (exame.resultado or '')
-            ])
-
-        tabela_exames = Table(dados_exames, colWidths=[2.2 * cm, 5 * cm, 7.3 * cm])
-        tabela_exames.setStyle(TableStyle([
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-            ('ALIGN', (2, 0), (2, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('FONTSIZE', (0, 1), (-1, -1), 8.5),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8e8e8')),
-            ('GRID', (0, 1), (-1, -1), 0.3, colors.lightgrey),
-        ]))
-        story.append(tabela_exames)
-        story.append(Spacer(1, 0.2 * cm))
-
-    # ================= 5. CONCLUSÃO =================
-    story.append(Paragraph("5. CONCLUSÃO", estilo_secao))
-    story.append(Paragraph(
-        "O trabalhador acima identificado foi submetido aos exames constantes neste ASO, "
-        "encontrando-se APTO para o exercício de suas funções, conforme NR-07.",
-        estilo_valor
-    ))
-    story.append(Spacer(1, 0.4 * cm))
-
-    # ================= ASSINATURAS (2 colunas) =================
-    story.append(Paragraph("6. ASSINATURAS", estilo_secao))
-    story.append(Spacer(1, 0.2 * cm))
-
-    # Tabela com duas colunas de assinatura
-    dados_assinaturas = [
-        [
-            Paragraph("<b>FUNCIONÁRIO</b>", estilo_campo),
-            Paragraph("<b>MÉDICO RESPONSÁVEL</b>", estilo_campo)
-        ],
-        [
-            Paragraph("_" * 35, estilo_valor),
-            Paragraph("_" * 35, estilo_valor)
-        ],
-        [
-            Paragraph(f"{func.nome or '_________________'}", estilo_valor),
-            Paragraph(f"{evento.crm_medico}/{evento.uf_crm}" if evento.crm_medico else "CRM: _________________",
-                      estilo_valor)
-        ],
-        [
-            Paragraph("Assinatura do Funcionário", estilo_valor),
-            Paragraph("Assinatura do Médico", estilo_valor)
-        ],
-        [
-            Paragraph(f"Data: {formatar_data(datetime.now())}", estilo_valor),
-            Paragraph(f"Data: {formatar_data(datetime.now())}", estilo_valor)
-        ],
-    ]
-
-    tabela_assinaturas = Table(dados_assinaturas, colWidths=[7 * cm, 7 * cm])
-    tabela_assinaturas.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8e8e8')),
-    ]))
-    story.append(tabela_assinaturas)
-
-    story.append(Spacer(1, 0.3 * cm))
-
-    # ================= RODAPÉ =================
-    story.append(Paragraph("<hr color='black' size='0.5'/>", styles['Normal']))
-    rodape = Paragraph(
-        "<font size=7>Documento eletrônico gerado conforme leiaute do eSocial (S-2220)</font>",
-        estilo_valor
-    )
-    story.append(rodape)
-
-    # Gerar PDF
-    doc.build(story, onFirstPage=bordas_pretas, onLaterPages=bordas_pretas)
-    buffer.seek(0)
-    return buffer
 
 # ================= ROTAS S-2221 =================
 
@@ -1643,91 +1200,7 @@ def view_xml_s2221(id):
     except Exception as e:
         flash(f'Erro ao gerar XML: {str(e)}', 'danger')
         return redirect(url_for('list_s2221'))
-
 ########################################################### EVENTO S 2220 #############################
-def gerar_xml_s2220(evento, empresa, funcionario, ambiente='2'):
-    """
-    Gera XML do evento S-2220 (ASO)
-    CPF do médico é opcional
-    """
-    from datetime import datetime
-
-    # Tratamento para CPF do médico (opcional)
-    cpf_medico = ""
-    if evento.cpf_medico:
-        # Remove caracteres não numéricos se houver
-        cpf_medico = ''.join(filter(str.isdigit, evento.cpf_medico))
-
-    # Tratamento para CNPJ da empresa
-    cnpj_empresa = ''.join(filter(str.isdigit, empresa.cnpj)) if empresa.cnpj else ""
-
-    # Tratamento para CPF do funcionário
-    cpf_funcionario = ''.join(filter(str.isdigit, funcionario.cpf)) if funcionario.cpf else ""
-
-    # Tratamento para matrícula eSocial
-    matricula = funcionario.matricula_esocial or ""
-
-    # Data do ASO
-    if hasattr(evento.data_aso, 'strftime'):
-        data_aso = evento.data_aso.strftime('%Y-%m-%d')
-    else:
-        data_aso = str(evento.data_aso)
-
-    # Monta o XML
-    xml = f'''<?xml version="1.0" encoding="UTF-8"?>
-<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtASO/v_S_01_02_00">
-    <evtASO Id="ID{evento.id}">
-        <ideEvento>
-            <indRetif>1</indRetif>
-            <nrRecibo/>
-            <tpAmb>{ambiente}</tpAmb>
-            <procEmi>1</procEmi>
-            <verProc>1.0</verProc>
-        </ideEvento>
-        <ideEmpregador>
-            <tpInsc>1</tpInsc>
-            <nrInsc>{cnpj_empresa}</nrInsc>
-        </ideEmpregador>
-        <trabalhador>
-            <cpfTrab>{cpf_funcionario}</cpfTrab>
-            <matricula>{matricula}</matricula>
-        </trabalhador>
-        <aso>
-            <dtAso>{data_aso}</dtAso>
-            <medico>
-                <crmMed>{evento.crm_medico}</crmMed>
-                <ufCrm>{evento.uf_crm}</ufCrm>'''
-
-    # Só adiciona o CPF se ele existir
-    if cpf_medico:
-        xml += f'''
-                <cpfMed>{cpf_medico}</cpfMed>'''
-
-    xml += '''
-            </medico>
-            <exames>'''
-
-    # Adiciona os exames
-    for exame in evento.exames:
-        if hasattr(exame.data_exame, 'strftime'):
-            data_exame = exame.data_exame.strftime('%Y-%m-%d')
-        else:
-            data_exame = str(exame.data_exame)
-
-        xml += f'''
-                <exame>
-                    <dtExame>{data_exame}</dtExame>
-                    <tpExame>{exame.tipo_exame}</tpExame>
-                    <resultadoExame>{exame.resultado}</resultadoExame>
-                </exame>'''
-
-    xml += '''
-            </exames>
-        </aso>
-    </evtASO>
-</eSocial>'''
-
-    return xml
 
 @app.route('/processar_s2220', methods=['POST'])
 @login_required
@@ -1876,7 +1349,226 @@ def view_pdf_s2220(id):
         return redirect(url_for('list_s2220'))
 
 
+def gerar_pdf_s2220(evento):
+    """Gera PDF do ASO (S-2220)"""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
 
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        topMargin=1.5 * cm,
+        bottomMargin=1.5 * cm,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        title=f"ASO_{evento.funcionario.nome}_{evento.id}"
+    )
+    styles = getSampleStyleSheet()
+
+    cor_cinza_claro = colors.HexColor('#f5f5f5')
+    cor_cinza_medio = colors.HexColor('#e0e0e0')
+    cor_cinza_escuro = colors.HexColor('#333333')
+    cor_borda = colors.HexColor('#999999')
+    cor_titulo = colors.HexColor('#2c3e50')
+
+    style_titulo_principal = ParagraphStyle(
+        name='TituloPrincipal',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=cor_titulo,
+        alignment=1,
+        spaceAfter=20,
+        fontName='Helvetica-Bold'
+    )
+    style_subtitulo = ParagraphStyle(
+        name='Subtitulo',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=cor_titulo,
+        spaceAfter=12,
+        fontName='Helvetica-Bold'
+    )
+    style_normal = ParagraphStyle(
+        name='Normal',
+        parent=styles['Normal'],
+        fontSize=10,
+        fontName='Helvetica',
+        textColor=cor_cinza_escuro
+    )
+    style_assinatura = ParagraphStyle(
+        name='Assinatura',
+        parent=styles['Normal'],
+        fontSize=9,
+        fontName='Helvetica',
+        textColor=cor_cinza_escuro,
+        alignment=1
+    )
+
+    def add_header_footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica-Bold', 10)
+        canvas.setFillColor(cor_cinza_escuro)
+        canvas.drawString(doc.leftMargin, doc.height + doc.topMargin - 10, "eSocial - Monitoramento da Saúde (S-2220)")
+        canvas.setFont('Helvetica', 8)
+        canvas.setFillColor(colors.grey)
+        canvas.drawRightString(doc.width + doc.leftMargin, doc.height + doc.topMargin - 10,
+                               f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        canvas.setStrokeColor(cor_borda)
+        canvas.setLineWidth(0.5)
+        canvas.line(doc.leftMargin, doc.height + doc.topMargin - 15, doc.width + doc.leftMargin,
+                    doc.height + doc.topMargin - 15)
+        canvas.setFont('Helvetica', 8)
+        canvas.drawString(doc.leftMargin, doc.bottomMargin - 10, f"Documento gerado eletronicamente - ID: {evento.id}")
+        canvas.drawRightString(doc.width + doc.leftMargin, doc.bottomMargin - 10, f"Página {doc.page}")
+        canvas.restoreState()
+
+    story = []
+    story.append(Paragraph("Evento S-2220 – Monitoramento da Saúde (ASO)", style_titulo_principal))
+    story.append(Spacer(1, 12))
+
+    story.append(Paragraph("Dados do Funcionário", style_subtitulo))
+    func = evento.funcionario
+    dados_func = [
+        ["Nome:", func.nome],
+        ["CPF:", func.cpf],
+        ["Matrícula eSocial:", func.matricula_esocial or ""],
+        ["CBO:", func.cbo or ""],
+        ["Nascimento:", func.nascimento.strftime('%d/%m/%Y') if func.nascimento else ""],
+        ["Admissão:", func.admissao.strftime('%d/%m/%Y') if func.admissao else ""],
+        ["Função/Cargo:", func.funcao or ""],
+    ]
+    t_func = Table(dados_func, colWidths=[4 * cm, 12 * cm])
+    t_func.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.5, cor_borda),
+        ('BACKGROUND', (0, 0), (0, -1), cor_cinza_claro),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (0, 0), (-1, -1), cor_cinza_escuro),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(t_func)
+    story.append(Spacer(1, 12))
+
+    story.append(Paragraph("Dados do ASO", style_subtitulo))
+    dados_aso = [
+        ["Data do ASO:", evento.data_aso.strftime('%d/%m/%Y')],
+        ["CRM Médico:", evento.crm_medico],
+        ["UF CRM:", evento.uf_crm],
+        ["CPF Médico:", evento.cpf_medico if evento.cpf_medico else "Não informado"],
+    ]
+    t_aso = Table(dados_aso, colWidths=[4 * cm, 12 * cm])
+    t_aso.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.5, cor_borda),
+        ('BACKGROUND', (0, 0), (0, -1), cor_cinza_claro),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(t_aso)
+    story.append(Spacer(1, 12))
+
+    story.append(Paragraph("Exames Realizados", style_subtitulo))
+    if evento.exames:
+        exames_data = [["Data", "Tipo de Exame", "Resultado"]]
+        for ex in evento.exames:
+            exames_data.append([
+                ex.data_exame.strftime('%d/%m/%Y'),
+                ex.tipo_exame,
+                ex.resultado
+            ])
+        t_exames = Table(exames_data, colWidths=[3 * cm, 5 * cm, 8 * cm])
+        t_exames.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 0.5, cor_borda),
+            ('BACKGROUND', (0, 0), (-1, 0), cor_cinza_medio),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), cor_cinza_escuro),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(t_exames)
+    else:
+        story.append(Paragraph("Nenhum exame registrado.", style_normal))
+
+    story.append(Spacer(1, 24))
+    story.append(Paragraph("Declaro que recebi o ASO e estou ciente dos resultados.", style_normal))
+    story.append(Spacer(1, 12))
+    assinatura_flowable = Paragraph(
+        "_________________________________________",
+        ParagraphStyle('AssinaturaLinha', parent=style_assinatura, alignment=1, fontSize=10, textColor=colors.black)
+    )
+    story.append(assinatura_flowable)
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(f"{func.nome} - {func.cpf}", style_assinatura))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(f"Assinatura do Funcionário (ou representante legal)", style_assinatura))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph(f"Data: ___/___/______", style_assinatura))
+    story.append(Spacer(1, 16))
+    story.append(Paragraph("_________________________________________", style_assinatura))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(f"Médico: {evento.crm_medico} - {evento.uf_crm}", style_assinatura))
+    story.append(Paragraph("Assinatura do Médico Responsável", style_assinatura))
+
+    doc.build(story, onFirstPage=add_header_footer, onLaterPages=add_header_footer)
+    buffer.seek(0)
+    return buffer
+
+
+@app.route('/debug-pdf')
+@login_required
+def debug_pdf():
+    """Rota para diagnosticar problemas com PDF"""
+    try:
+        # Verificar se existem eventos
+        total_eventos = EventoS2220.query.count()
+
+        if total_eventos == 0:
+            return "Nenhum evento S-2220 encontrado. Crie um primeiro.", 404
+
+        # Pega o primeiro evento
+        evento = EventoS2220.query.first()
+
+        # Verificar se o funcionário existe
+        if not evento.funcionario:
+            return "Evento sem funcionário associado", 400
+
+        # Verificar se o funcionário tem dados básicos
+        func = evento.funcionario
+        info = f"""
+        <h3>Informações do Evento:</h3>
+        <ul>
+            <li>ID do Evento: {evento.id}</li>
+            <li>Funcionário: {func.nome}</li>
+            <li>CPF: {func.cpf}</li>
+            <li>Matrícula eSocial: {func.matricula_esocial or 'Não informada'}</li>
+            <li>CBO: {func.cbo or 'Não informado'}</li>
+            <li>Data ASO: {evento.data_aso}</li>
+            <li>CRM: {evento.crm_medico}</li>
+            <li>UF CRM: {evento.uf_crm}</li>
+            <li>Total de exames: {evento.exames.count()}</li>
+        </ul>
+        <h3>Testar PDF:</h3>
+        <a href="{url_for('download_pdf_s2220', id=evento.id)}" class="btn btn-primary">Baixar PDF</a>
+        """
+        return info
+    except Exception as e:
+        import traceback
+        return f"Erro: {str(e)}<br><pre>{traceback.format_exc()}</pre>", 500
 ######################################################## ================= ROTAS S-2210 =================
 
 @app.route('/s2210/create', methods=['GET'])
@@ -2129,55 +1821,72 @@ def send_s2240(id):
 @app.route('/processar_s2240', methods=['POST'])
 @login_required
 def processar_s2240():
-    from datetime import datetime  # ← IMPORTANTE!
     import traceback
-    from io import BytesIO
-    from flask import send_file
 
     try:
         # Captura os dados do formulário
         funcionario_id = request.form.get('funcionario_id')
-        data_avaliacao_str = request.form.get('data_avaliacao')
+        data_avaliacao = request.form.get('data_avaliacao')
         cpf_avaliador = request.form.get('cpf_avaliador')
         apenas_xml = request.form.get('apenas_xml') == 'true'
 
-        # Captura os riscos
-        riscos = []
-        codigos = request.form.getlist('agente_codigo[]')
+        # ================= VALIDAÇÕES =================
+
+        # 1. Validar campos obrigatórios
+        if not funcionario_id:
+            return "Campo 'funcionário' é obrigatório", 400
+        if not data_avaliacao:
+            return "Campo 'data da avaliação' é obrigatório", 400
+        if not cpf_avaliador:
+            return "Campo 'CPF do avaliador' é obrigatório", 400
+
+        # 2. Validar CPF do avaliador
+        if not validar_cpf(cpf_avaliador):
+            return f"CPF do avaliador inválido: {cpf_avaliador}. Digite um CPF válido (ex: 529.982.247-25)", 400
+
+        # 3. Validar se funcionário existe
+        funcionario = db.session.get(Funcionario, int(funcionario_id))
+        if not funcionario:
+            return f"Funcionário ID {funcionario_id} não encontrado", 404
+
+        # 4. Validar se funcionário tem matrícula e CBO
+        if not funcionario.matricula_esocial or not funcionario.cbo:
+            return "Funcionário sem matrícula eSocial ou CBO cadastrado. Por favor, edite o funcionário e preencha esses campos obrigatórios.", 400
+
+        # 5. Validar agentes nocivos
+        agentes_codigo = request.form.getlist('agente_codigo[]')
         intensidades = request.form.getlist('intensidade[]')
         epis = request.form.getlist('epi_utilizado[]')
 
-        for i in range(len(codigos)):
-            if codigos[i]:
+        if not agentes_codigo or not any(agentes_codigo):
+            return "Informe pelo menos um agente nocivo", 400
+
+        # Monta lista de riscos
+        riscos = []
+        for i in range(len(agentes_codigo)):
+            if agentes_codigo[i] and agentes_codigo[i].strip():
                 riscos.append({
-                    'codigo_agente': codigos[i],
-                    'intensidade': intensidades[i] if i < len(intensidades) else '',
-                    'epi': epis[i] if i < len(epis) else ''
+                    'codigo_agente': agentes_codigo[i].strip(),
+                    'intensidade': intensidades[i].strip() if i < len(intensidades) else '',
+                    'epi': epis[i].strip() if i < len(epis) else ''
                 })
 
-        # Busca o funcionário
-        funcionario = db.session.get(Funcionario, funcionario_id)
-        if not funcionario:
-            flash('Funcionário não encontrado', 'danger')
-            return redirect(url_for('create_s2240'))
+        if not riscos:
+            return "Informe pelo menos um agente nocivo válido", 400
 
-        print("Dados recebidos:", dict(request.form))
-        print("Riscos:", riscos)
+        # ================= PROCESSAMENTO =================
 
-        # Converte a data
-        data_avaliacao = datetime.strptime(data_avaliacao_str, '%Y-%m-%d').date()
-
-        # Se for apenas gerar XML
+        # Se for apenas gerar XML (não salvar no banco)
         if apenas_xml:
             try:
-                # Cria evento temporário
+                # Cria evento temporário para gerar XML
                 evento_temp = EventoS2240(
                     funcionario_id=funcionario.id,
-                    data_avaliacao=data_avaliacao,
+                    data_avaliacao=datetime.strptime(data_avaliacao, '%Y-%m-%d').date(),
                     cpf_avaliador=cpf_avaliador
                 )
 
-                # Adiciona riscos
+                # Adiciona riscos temporários
                 for r in riscos:
                     risco_temp = RiscoS2240(
                         codigo_agente=r['codigo_agente'],
@@ -2188,10 +1897,6 @@ def processar_s2240():
 
                 # Gera XML
                 xml_gerado = gerar_xml_s2240(evento_temp, funcionario.empresa, funcionario, '2')
-
-                if not xml_gerado:
-                    raise Exception("Função gerar_xml_s2240 retornou vazio ou None")
-
                 buffer = BytesIO(xml_gerado.encode('utf-8'))
 
                 return send_file(
@@ -2203,19 +1908,21 @@ def processar_s2240():
             except Exception as e:
                 print(f"Erro ao gerar XML: {str(e)}")
                 traceback.print_exc()
-                flash(f'Erro ao gerar XML: {str(e)}', 'danger')
-                return redirect(url_for('create_s2240'))
+                return f"Erro ao gerar XML: {str(e)}", 500
 
-        # Salvar no banco
+        # ================= SALVAR NO BANCO DE DADOS =================
+
         try:
+            # Cria o evento
             evento = EventoS2240(
                 funcionario_id=funcionario.id,
-                data_avaliacao=data_avaliacao,
+                data_avaliacao=datetime.strptime(data_avaliacao, '%Y-%m-%d').date(),
                 cpf_avaliador=cpf_avaliador
             )
             db.session.add(evento)
-            db.session.flush()
+            db.session.flush()  # Para obter o ID do evento
 
+            # Adiciona os riscos
             for r in riscos:
                 risco = RiscoS2240(
                     evento_id=evento.id,
@@ -2226,21 +1933,25 @@ def processar_s2240():
                 db.session.add(risco)
 
             db.session.commit()
-            flash('Evento S-2240 criado com sucesso!', 'success')
-            return redirect(url_for('list_s2240'))
+
+            # Retorna sucesso (para JSON) ou redireciona
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return {'success': True, 'message': 'Evento S-2240 criado com sucesso!', 'id': evento.id}, 200
+            else:
+                flash('Evento S-2240 criado com sucesso!', 'success')
+                return redirect(url_for('list_s2240'))
 
         except Exception as e:
             db.session.rollback()
-            print(f"Erro ao salvar: {str(e)}")
+            print(f"Erro ao salvar no banco: {str(e)}")
             traceback.print_exc()
-            flash(f'Erro ao salvar: {str(e)}', 'danger')
-            return redirect(url_for('create_s2240'))
+            return f"Erro ao salvar evento: {str(e)}", 500
 
     except Exception as e:
-        print(f"Erro geral: {str(e)}")
+        print(f"Erro inesperado: {str(e)}")
         traceback.print_exc()
-        flash(f'Erro no processamento: {str(e)}', 'danger')
-        return redirect(url_for('create_s2240'))
+        return f"Erro interno do servidor: {str(e)}", 500
+
 
 @app.route('/enviar_xml_manual', methods=['GET', 'POST'])
 @login_required
@@ -2358,566 +2069,268 @@ def carregar_certificado(pfx_path, senha):
         )
 
 
+# main.py
+@app.route('/config_certificado', methods=['GET', 'POST'])
+@login_required
+def config_certificado():
+    if current_user.tipo == 'admin':
+        # Admin pode ver todas as empresas
+        empresas = Empresa.query.all()
+        if request.method == 'POST':
+            empresa_id = request.form.get('empresa_id')
+            empresa = Empresa.query.get(empresa_id)
+        else:
+            # GET - pega a primeira empresa ou None
+            empresa = empresas[0] if empresas else None
+    else:
+        # Cliente só vê suas empresas
+        empresas = Empresa.query.filter_by(usuario_id=current_user.id).all()
+        if request.method == 'POST':
+            empresa_id = request.form.get('empresa_id')
+            empresa = Empresa.query.filter_by(
+                id=empresa_id,
+                usuario_id=current_user.id
+            ).first()
+        else:
+            # GET - pega a primeira empresa do cliente
+            empresa = empresas[0] if empresas else None
+
+    # Buscar configuração existente para a empresa selecionada
+    config = None
+    if empresa:
+        config = ConfigCertificado.query.filter_by(empresa_id=empresa.id).first()
+
+    if request.method == 'POST':
+        # Processar o upload do certificado
+        certificado = request.files.get('certificado')
+        senha = request.form.get('senha')
+        ambiente = request.form.get('ambiente', '2')
+
+        if certificado and certificado.filename:
+            # Salvar o arquivo
+            filename = secure_filename(f"{empresa.cnpj}_{certificado.filename}")
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            certificado.save(filepath)
+
+            if config:
+                # Atualizar configuração existente
+                config.certificado_pfx = filepath
+                config.senha = senha
+                config.ambiente = ambiente
+                config.data_config = datetime.utcnow()
+            else:
+                # Criar nova configuração
+                config = ConfigCertificado(
+                    empresa_id=empresa.id,
+                    usuario_id=current_user.id,
+                    certificado_pfx=filepath,
+                    senha=senha,
+                    ambiente=ambiente
+                )
+                db.session.add(config)
+
+            db.session.commit()
+            flash('Certificado configurado com sucesso!', 'success')
+            return redirect(url_for('config_certificado'))
+        else:
+            flash('Selecione um arquivo de certificado.', 'danger')
+
+    return render_template('config_certificado.html',
+                           empresas=empresas,
+                           empresa=empresa,
+                           config=config)
+
 @app.route('/s2220/enviar/<int:id>')
 @login_required
 def enviar_s2220(id):
-    evento = db.session.get(EventoS2220, id)
-    if not evento:
-        flash('Evento não encontrado!', 'error')
-        return redirect(url_for('list_s2220'))
+    evento = EventoS2220.query.get_or_404(id)
 
     if evento.status == 'enviado':
-        flash('Este evento já foi enviado!', 'warning')
+        flash('Evento já foi enviado!', 'warning')
         return redirect(url_for('list_s2220'))
 
-    # Verificar modo de envio
-    modo_envio = session.get('modo_envio', False)
-
-    # Buscar configuração do certificado
     cfg = ConfigCertificado.query.first()
-
-    if not cfg and modo_envio:
-        flash('Configure o certificado digital antes de enviar em modo PRODUÇÃO!', 'danger')
+    if not cfg:
+        flash('Configure o certificado digital primeiro!', 'danger')
         return redirect(url_for('config_certificado'))
 
     try:
-        funcionario = evento.funcionario
-        empresa = funcionario.empresa
+        # Versão simplificada - não usa certificado real
+        from esocial_utils import gerar_xml_s2220, enviar_lote
 
-        # Validar dados obrigatórios
-        if not empresa.cnpj:
-            flash('Empresa sem CNPJ configurado!', 'error')
-            return redirect(url_for('list_s2220'))
+        xml = gerar_xml_s2220(evento, evento.funcionario.empresa, evento.funcionario, cfg.ambiente)
+        xml_assinado = xml  # Sem assinatura no modo simplificado
+        recibo = enviar_lote(xml_assinado, cfg.ambiente)
 
-        if not funcionario.matricula_esocial:
-            flash('Funcionário sem matrícula eSocial!', 'error')
-            return redirect(url_for('list_s2220'))
-
-        if not funcionario.cpf:
-            flash('Funcionário sem CPF!', 'error')
-            return redirect(url_for('list_s2220'))
-
-        # Modo TESTE - Simular envio
-        if not modo_envio:
-            # Simular envio
-            import uuid
-            recibo_simulado = f"SIMULADO_{uuid.uuid4().hex[:16]}"
-
-            evento.status = 'enviado'
-            evento.recibo = recibo_simulado
-            evento.data_envio = datetime.utcnow()
-
-            # Gerar XML mesmo em modo teste
-            try:
-                xml_gerado = gerar_xml_s2220(evento, empresa, funcionario, ambiente='2')
-                evento.xml_enviado = xml_gerado
-            except Exception as xml_err:
-                print(f"Erro ao gerar XML: {str(xml_err)}")
-                evento.xml_enviado = f"<!-- Erro ao gerar XML: {str(xml_err)} -->"
-
-            db.session.commit()
-
-            flash(f'✅ Evento enviado em MODO TESTE! Recibo: {recibo_simulado}', 'success')
-            return redirect(url_for('list_s2220'))
-
-        # Modo PRODUÇÃO - Envio real
-        ambiente = cfg.ambiente if cfg.ambiente else '1'
-
-        # Carregar certificado
-        if not cfg.certificado_pfx or not os.path.exists(cfg.certificado_pfx):
-            flash('Arquivo de certificado não encontrado!', 'error')
-            return redirect(url_for('config_certificado'))
-
-        # Verificar se a senha existe
-        if not cfg.senha:
-            flash('Senha do certificado não configurada!', 'error')
-            return redirect(url_for('config_certificado'))
-
-        try:
-            cert_pem, key_pem = carregar_certificado(cfg.certificado_pfx, cfg.senha)
-
-            if not cert_pem or not key_pem:
-                flash('Erro ao carregar certificado!', 'error')
-                return redirect(url_for('config_certificado'))
-        except Exception as cert_err:
-            flash(f'Erro ao carregar certificado: {str(cert_err)}', 'error')
-            return redirect(url_for('config_certificado'))
-
-        # Gerar XML
-        try:
-            xml = gerar_xml_s2220(evento, empresa, funcionario, ambiente)
-
-            if not xml or len(xml.strip()) == 0:
-                flash('Erro ao gerar XML: XML vazio!', 'error')
-                return redirect(url_for('list_s2220'))
-        except Exception as xml_err:
-            flash(f'Erro ao gerar XML: {str(xml_err)}', 'error')
-            return redirect(url_for('list_s2220'))
-
-        # Assinar XML
-        try:
-            xml_assinado = assinar_xml(xml, cert_pem, key_pem)
-
-            if not xml_assinado or len(xml_assinado.strip()) == 0:
-                flash('Erro ao assinar XML: XML assinado vazio!', 'error')
-                return redirect(url_for('list_s2220'))
-        except Exception as sign_err:
-            flash(f'Erro ao assinar XML: {str(sign_err)}', 'error')
-            return redirect(url_for('list_s2220'))
-
-        # Enviar lote
-        try:
-            recibo = enviar_lote(xml_assinado, ambiente)
-
-            if not recibo:
-                flash('Erro ao enviar: Recibo vazio!', 'error')
-                return redirect(url_for('list_s2220'))
-        except Exception as send_err:
-            flash(f'Erro ao enviar para o eSocial: {str(send_err)}', 'error')
-            return redirect(url_for('list_s2220'))
-
-        # Atualizar evento
         evento.xml_enviado = xml_assinado
         evento.recibo = recibo
         evento.status = 'enviado'
-        evento.data_envio = datetime.utcnow()
+        evento.data_envio = datetime.now()
         db.session.commit()
 
-        flash('Evento enviado com sucesso para o eSocial!', 'success')
-
+        flash(f'Evento enviado com sucesso! Recibo: {recibo}', 'success')
     except Exception as e:
-        db.session.rollback()
-        import traceback
-        traceback.print_exc()
         flash(f'Erro ao enviar: {str(e)}', 'danger')
 
     return redirect(url_for('list_s2220'))
 
 
-@app.route('/ver_recibo/<int:id>')
-@login_required
-def ver_recibo(id):
-    evento = db.session.get(EventoS2220, id)
-    if not evento or not evento.recibo:
-        flash('Recibo não encontrado!', 'error')
-        return redirect(url_for('list_s2220'))
-
-    # Retorna o recibo como texto puro
-    return Response(
-        evento.recibo,
-        mimetype='text/plain',
-        headers={'Content-Disposition': f'inline; filename=recibo_{id}.txt'}
-    )
 # ================= ENVIO S-2221 (MODO TESTE) =================
 @app.route('/s2221/enviar/<int:id>')
 @login_required
 def enviar_s2221(id):
-    import traceback
-    from functions_s2221 import gerar_xml_s2221
-    from esocial_utils import enviar_lote, carregar_certificado, assinar_xml
-    from models import ReciboEnvio
-    from datetime import datetime
+    evento = EventoS2221.query.get_or_404(id)
+
+    if evento.status == 'enviado':
+        flash('Evento já foi enviado!', 'warning')
+        return redirect(url_for('list_s2221'))
 
     try:
-        evento = db.session.get(EventoS2221, id)
-        if not evento:
-            flash('Evento não encontrado', 'danger')
-            return redirect(url_for('list_s2221'))
+        from esocial_utils import gerar_xml_s2221, enviar_lote
 
-        print(f"\n{'=' * 50}")
-        print(f"ENVIANDO S-2221 ID: {id}")
-        print(f"{'=' * 50}")
+        # Gera o XML
+        xml = gerar_xml_s2221(evento, evento.funcionario.empresa, evento.funcionario, '2')
 
-        cfg = ConfigCertificado.query.first()
-        if not cfg:
-            flash('Configure o certificado digital primeiro!', 'danger')
-            return redirect(url_for('config_certificado'))
+        # Envia (modo teste - sem certificado)
+        recibo = enviar_lote(xml, '2')
 
-        # Gera XML
-        xml_gerado = gerar_xml_s2221(
-            evento,
-            evento.funcionario.empresa,
-            evento.funcionario
-        )
-
-        if not xml_gerado:
-            flash('Erro: XML gerado está vazio', 'danger')
-            return redirect(url_for('list_s2221'))
-
-        print(f"✅ XML gerado: {len(xml_gerado)} bytes")
-
-        # Carrega certificado e assina
-        cert_pem, key_pem = carregar_certificado(cfg.certificado_pfx, cfg.senha)
-        xml_assinado = assinar_xml(xml_gerado, cert_pem, key_pem)
-
-        # Envia
-        resposta = enviar_lote(xml_assinado, str(cfg.ambiente))
-
-        print(f"Resposta: {resposta}")
-
-        # CORREÇÃO: Salva recibo (resposta é string)
-        nome_xml = f"S2221_{evento.funcionario.nome.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
-
-        recibo = ReciboEnvio(
-            evento_tipo="S-2221",
-            evento_id=evento.id,
-            nome_xml=nome_xml,
-            recibo=str(resposta),  # resposta é string
-            data_envio=datetime.now(),
-            status="enviado",
-            mensagem_erro=""
-        )
-        db.session.add(recibo)
-
-        evento.status = "enviado"
+        evento.xml_enviado = xml
+        evento.recibo = recibo
+        evento.status = 'enviado'
         evento.data_envio = datetime.now()
         db.session.commit()
 
-        flash('Evento S-2221 enviado com sucesso!', 'success')
-
+        flash(f'✅ Evento S-2221 enviado com sucesso! Recibo: {recibo[:100]}...', 'success')
     except Exception as e:
-        print(f"❌ ERRO: {str(e)}")
-        traceback.print_exc()
-        flash(f'Erro ao enviar: {str(e)}', 'danger')
+        flash(f'❌ Erro ao enviar: {str(e)}', 'danger')
 
     return redirect(url_for('list_s2221'))
+
 
 # ================= ENVIO S-2210 (MODO TESTE) =================
 @app.route('/s2210/enviar/<int:id>')
 @login_required
 def enviar_s2210(id):
-    import traceback
-    from functions_s2210 import gerar_xml_s2210
-    from esocial_utils import enviar_lote, carregar_certificado, assinar_xml
-    from models import ReciboEnvio
-    from datetime import datetime
+    evento = EventoS2210.query.get_or_404(id)
+
+    if evento.status == 'enviado':
+        flash('Evento já foi enviado!', 'warning')
+        return redirect(url_for('list_s2210'))
 
     try:
-        evento = db.session.get(EventoS2210, id)
-        if not evento:
-            flash('Evento não encontrado', 'danger')
-            return redirect(url_for('list_s2210'))
+        from esocial_utils import gerar_xml_s2210, enviar_lote
 
-        print(f"\n{'=' * 50}")
-        print(f"ENVIANDO S-2210 ID: {id}")
-        print(f"{'=' * 50}")
+        # Gera o XML
+        xml = gerar_xml_s2210(evento, evento.funcionario.empresa, evento.funcionario, '2')
 
-        cfg = ConfigCertificado.query.first()
-        if not cfg:
-            flash('Configure o certificado digital primeiro!', 'danger')
-            return redirect(url_for('config_certificado'))
+        # Envia (modo teste - sem certificado)
+        recibo = enviar_lote(xml, '2')
 
-        # Gera XML
-        xml_gerado = gerar_xml_s2210(
-            evento,
-            evento.funcionario.empresa,
-            evento.funcionario
-        )
-
-        if not xml_gerado:
-            flash('Erro: XML gerado está vazio', 'danger')
-            return redirect(url_for('list_s2210'))
-
-        print(f"✅ XML gerado: {len(xml_gerado)} bytes")
-
-        # Carrega certificado e assina
-        cert_pem, key_pem = carregar_certificado(cfg.certificado_pfx, cfg.senha)
-        xml_assinado = assinar_xml(xml_gerado, cert_pem, key_pem)
-
-        # Envia
-        resposta = enviar_lote(xml_assinado, str(cfg.ambiente))
-
-        print(f"Resposta: {resposta}")
-
-        # CORREÇÃO: Salva recibo (resposta é string, não dicionário)
-        nome_xml = f"S2210_{evento.funcionario.nome.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
-
-        recibo = ReciboEnvio(
-            evento_tipo="S-2210",
-            evento_id=evento.id,
-            nome_xml=nome_xml,
-            recibo=str(resposta),  # resposta é string
-            data_envio=datetime.now(),
-            status="enviado",
-            mensagem_erro=""
-        )
-        db.session.add(recibo)
-
-        evento.status = "enviado"
+        evento.xml_enviado = xml
+        evento.recibo = recibo
+        evento.status = 'enviado'
         evento.data_envio = datetime.now()
         db.session.commit()
 
-        flash('Evento S-2210 enviado com sucesso!', 'success')
-
+        flash(f'✅ Evento S-2210 enviado com sucesso! Recibo: {recibo[:100]}...', 'success')
     except Exception as e:
-        print(f"❌ ERRO: {str(e)}")
-        traceback.print_exc()
-        flash(f'Erro ao enviar: {str(e)}', 'danger')
+        flash(f'❌ Erro ao enviar: {str(e)}', 'danger')
 
     return redirect(url_for('list_s2210'))
+
 
 # ================= ENVIO S-2240 (MODO TESTE) =================
 @app.route('/s2240/enviar/<int:id>')
 @login_required
 def enviar_s2240(id):
-    import traceback
-    from functions_s2240 import gerar_xml_s2240
-    from esocial_utils import enviar_lote, carregar_certificado, assinar_xml
-    from models import ReciboEnvio
+    evento = EventoS2240.query.get_or_404(id)
+
+    if evento.status == 'enviado':
+        flash('Evento já foi enviado!', 'warning')
+        return redirect(url_for('list_s2240'))
 
     try:
-        evento = db.session.get(EventoS2240, id)
-        if not evento:
-            flash('Evento não encontrado', 'danger')
-            return redirect(url_for('list_s2240'))
+        from esocial_utils import gerar_xml_s2240, enviar_lote
 
-        print(f"\n{'=' * 50}")
-        print(f"ENVIANDO S-2240 ID: {id}")
-        print(f"{'=' * 50}")
+        # Gera o XML
+        xml = gerar_xml_s2240(evento, evento.funcionario.empresa, evento.funcionario, '2')
 
-        # Verifica certificado
-        cfg = ConfigCertificado.query.first()
-        if not cfg:
-            flash('Configure o certificado digital primeiro!', 'danger')
-            return redirect(url_for('config_certificado'))
+        # Envia (modo teste - sem certificado)
+        recibo = enviar_lote(xml, '2')
 
-        # Gera XML
-        xml_gerado = gerar_xml_s2240(
-            evento,
-            evento.funcionario.empresa,
-            evento.funcionario
-        )
-
-        if not xml_gerado:
-            flash('Erro: XML gerado está vazio', 'danger')
-            return redirect(url_for('list_s2240'))
-
-        # Carrega e assina
-        cert_pem, key_pem = carregar_certificado(cfg.certificado_pfx, cfg.senha)
-        xml_assinado = assinar_xml(xml_gerado, cert_pem, key_pem)
-
-        # Envia
-        resposta = enviar_lote(xml_assinado, str(cfg.ambiente))
-
-        # SALVA O RECIBO
-        nome_xml = f"S2240_{evento.funcionario.nome.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
-
-        recibo = ReciboEnvio(
-            evento_tipo='S-2240',
-            evento_id=evento.id,
-            protocolo=resposta.get('protocolo', ''),
-            status='enviado',
-            resposta_completa=str(resposta),
-            data_envio=datetime.now(),
-            funcionario_id=evento.funcionario_id,
-            nome_xml=nome_xml
-        )
-        db.session.add(recibo)
-
-        # Atualiza status do evento
+        evento.xml_enviado = xml
+        evento.recibo = recibo
         evento.status = 'enviado'
         evento.data_envio = datetime.now()
-
         db.session.commit()
 
-        flash('Evento S-2240 enviado com sucesso!', 'success')
-
+        flash(f'✅ Evento S-2240 enviado com sucesso! Recibo: {recibo[:100]}...', 'success')
     except Exception as e:
-        print(f"❌ ERRO: {str(e)}")
-        traceback.print_exc()
-        flash(f'Erro ao enviar: {str(e)}', 'danger')
+        flash(f'❌ Erro ao enviar: {str(e)}', 'danger')
 
     return redirect(url_for('list_s2240'))
-
 
 @app.route('/recibos')
 @login_required
 def listar_recibos():
-    from models import ReciboEnvio, EventoS2220, EventoS2210, EventoS2221, EventoS2240
-    from sqlalchemy import or_
+    """Lista todos os recibos de envio"""
+    recibos = []
 
-    # Base query
-    query = ReciboEnvio.query
+    # Busca recibos de todos os tipos de evento
+    for evento in EventoS2220.query.filter(EventoS2220.recibo.isnot(None)).all():
+        recibos.append({
+            'id': evento.id,
+            'tipo': 'S-2220 (ASO)',
+            'tipo_url': 's2220',  # NOVO
+            'funcionario': evento.funcionario.nome,
+            'recibo': evento.recibo,
+            'data_envio': evento.data_envio,
+            'status': evento.status,
+            'nome_xml': f'S2220_{evento.funcionario.nome}_{evento.data_aso}.xml'
+        })
 
-    # Filtros
-    tipo = request.args.get('tipo')
-    status = request.args.get('status')
-    funcionario_nome = request.args.get('funcionario')
+    for evento in EventoS2221.query.filter(EventoS2221.recibo.isnot(None)).all():
+        recibos.append({
+            'id': evento.id,
+            'tipo': 'S-2221 (Exame Toxicológico)',
+            'tipo_url': 's2221',  # NOVO
+            'funcionario': evento.funcionario.nome,
+            'recibo': evento.recibo,
+            'data_envio': evento.data_envio,
+            'status': evento.status,
+            'nome_xml': f'S2221_{evento.funcionario.nome}_{evento.data_exame}.xml'
+        })
 
-    if tipo:
-        query = query.filter_by(evento_tipo=tipo)
-    if status:
-        query = query.filter_by(status=status)
+    for evento in EventoS2210.query.filter(EventoS2210.recibo.isnot(None)).all():
+        recibos.append({
+            'id': evento.id,
+            'tipo': 'S-2210 (CAT)',
+            'tipo_url': 's2210',  # NOVO
+            'funcionario': evento.funcionario.nome,
+            'recibo': evento.recibo,
+            'data_envio': evento.data_envio,
+            'status': evento.status,
+            'nome_xml': f'S2210_{evento.funcionario.nome}_{evento.data_acidente}.xml'
+        })
 
-    # Busca todos os recibos
-    recibos = query.order_by(ReciboEnvio.data_envio.desc()).all()
+    for evento in EventoS2240.query.filter(EventoS2240.recibo.isnot(None)).all():
+        recibos.append({
+            'id': evento.id,
+            'tipo': 'S-2240 (Riscos Ambientais)',
+            'tipo_url': 's2240',  # NOVO
+            'funcionario': evento.funcionario.nome,
+            'recibo': evento.recibo,
+            'data_envio': evento.data_envio,
+            'status': evento.status,
+            'nome_xml': f'S2240_{evento.funcionario.nome}_{evento.data_avaliacao}.xml'
+        })
 
-    # Filtro por nome do funcionário (pós-processamento)
-    if funcionario_nome:
-        recibos_filtrados = []
-        for recibo in recibos:
-            try:
-                if recibo.evento_tipo == 'S-2220':
-                    evento = db.session.get(EventoS2220, recibo.evento_id)
-                    nome = evento.funcionario.nome if evento and evento.funcionario else ''
-                elif recibo.evento_tipo == 'S-2210':
-                    evento = db.session.get(EventoS2210, recibo.evento_id)
-                    nome = evento.funcionario.nome if evento and evento.funcionario else ''
-                elif recibo.evento_tipo == 'S-2221':
-                    evento = db.session.get(EventoS2221, recibo.evento_id)
-                    nome = evento.funcionario.nome if evento and evento.funcionario else ''
-                elif recibo.evento_tipo == 'S-2240':
-                    evento = db.session.get(EventoS2240, recibo.evento_id)
-                    nome = evento.funcionario.nome if evento and evento.funcionario else ''
-                else:
-                    nome = ''
+    # Ordenar por data de envio (mais recente primeiro)
+    recibos.sort(key=lambda x: x['data_envio'] or datetime.min, reverse=True)
 
-                if funcionario_nome.lower() in nome.lower():
-                    recibos_filtrados.append(recibo)
-            except:
-                pass
-        recibos = recibos_filtrados
-
-    # Adiciona nome do funcionário ao objeto recibo
-    for recibo in recibos:
-        try:
-            if recibo.evento_tipo == 'S-2220':
-                evento = db.session.get(EventoS2220, recibo.evento_id)
-                recibo.funcionario_nome = evento.funcionario.nome if evento and evento.funcionario else 'N/A'
-            elif recibo.evento_tipo == 'S-2210':
-                evento = db.session.get(EventoS2210, recibo.evento_id)
-                recibo.funcionario_nome = evento.funcionario.nome if evento and evento.funcionario else 'N/A'
-            elif recibo.evento_tipo == 'S-2221':
-                evento = db.session.get(EventoS2221, recibo.evento_id)
-                recibo.funcionario_nome = evento.funcionario.nome if evento and evento.funcionario else 'N/A'
-            elif recibo.evento_tipo == 'S-2240':
-                evento = db.session.get(EventoS2240, recibo.evento_id)
-                recibo.funcionario_nome = evento.funcionario.nome if evento and evento.funcionario else 'N/A'
-            else:
-                recibo.funcionario_nome = 'N/A'
-        except:
-            recibo.funcionario_nome = 'N/A'
-
-    return render_template('recibos_list.html', recibos=recibos)
+    return render_template('recibos.html', recibos=recibos)
 
 
-@app.route('/recibos/detalhe/<int:id>')
-@login_required
-def recibo_detalhe(id):
-    from models import ReciboEnvio, EventoS2220, EventoS2210, EventoS2221, EventoS2240
-
-    recibo = db.session.get(ReciboEnvio, id)
-    if not recibo:
-        flash('Recibo não encontrado', 'danger')
-        return redirect(url_for('listar_recibos'))
-
-    # Busca o evento relacionado
-    evento = None
-    if recibo.evento_tipo == 'S-2220':
-        evento = db.session.get(EventoS2220, recibo.evento_id)
-    elif recibo.evento_tipo == 'S-2210':
-        evento = db.session.get(EventoS2210, recibo.evento_id)
-    elif recibo.evento_tipo == 'S-2221':
-        evento = db.session.get(EventoS2221, recibo.evento_id)
-    elif recibo.evento_tipo == 'S-2240':
-        evento = db.session.get(EventoS2240, recibo.evento_id)
-
-    return render_template('recibos_detalhe.html', recibo=recibo, evento=evento)
-
-
-@app.route('/recibos/pdf/<int:id>')
-@login_required
-def recibo_pdf(id):
-    from models import ReciboEnvio, EventoS2220, EventoS2210, EventoS2221, EventoS2240
-    from reportlab.lib.pagesizes import A4
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.utils import simpleSplit
-    from io import BytesIO
-    from flask import make_response
-    from datetime import datetime
-
-    recibo = db.session.get(ReciboEnvio, id)
-    if not recibo:
-        flash('Recibo não encontrado', 'danger')
-        return redirect(url_for('listar_recibos'))
-
-    # Busca o evento relacionado
-    evento = None
-    if recibo.evento_tipo == 'S-2220':
-        evento = db.session.get(EventoS2220, recibo.evento_id)
-    elif recibo.evento_tipo == 'S-2210':
-        evento = db.session.get(EventoS2210, recibo.evento_id)
-    elif recibo.evento_tipo == 'S-2221':
-        evento = db.session.get(EventoS2221, recibo.evento_id)
-    elif recibo.evento_tipo == 'S-2240':
-        evento = db.session.get(EventoS2240, recibo.evento_id)
-
-    # Cria o PDF
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-
-    # Título
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, height - 50, f"COMPROVANTE DE ENVIO - {recibo.evento_tipo}")
-
-    # Linha
-    p.line(50, height - 60, width - 50, height - 60)
-
-    # Dados do recibo
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, height - 90, "DADOS DO RECIBO:")
-
-    p.setFont("Helvetica", 10)
-    p.drawString(50, height - 110, f"ID do Recibo: {recibo.id}")
-    p.drawString(50, height - 125, f"Tipo de Evento: {recibo.evento_tipo}")
-    p.drawString(50, height - 140,
-                 f"Data de Envio: {recibo.data_envio.strftime('%d/%m/%Y %H:%M:%S') if recibo.data_envio else 'N/A'}")
-    p.drawString(50, height - 155, f"Status: {recibo.status}")
-
-    # Funcionário
-    if evento and hasattr(evento, 'funcionario') and evento.funcionario:
-        p.drawString(50, height - 175, f"Funcionário: {evento.funcionario.nome}")
-        p.drawString(50, height - 190, f"CPF: {evento.funcionario.cpf}")
-
-    # Recibo/Protocolo
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, height - 220, "PROTOCOLO/RECIBO:")
-    p.setFont("Helvetica", 10)
-
-    # Quebra o texto do recibo em múltiplas linhas
-    recibo_texto = recibo.recibo if recibo.recibo else "N/A"
-    linhas = simpleSplit(recibo_texto, "Helvetica", 10, width - 100)
-    y = height - 240
-    for linha in linhas:
-        p.drawString(50, y, linha)
-        y -= 15
-
-    # Nome do XML
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y - 20, "ARQUIVO XML:")
-    p.setFont("Helvetica", 10)
-    p.drawString(50, y - 40, recibo.nome_xml if recibo.nome_xml else "N/A")
-
-    # Mensagem de erro se houver
-    if recibo.mensagem_erro:
-        p.setFillColorRGB(1, 0, 0)
-        p.drawString(50, y - 65, f"ERRO: {recibo.mensagem_erro}")
-        p.setFillColorRGB(0, 0, 0)
-
-    # Rodapé
-    p.setFont("Helvetica-Oblique", 8)
-    p.drawString(50, 50, f"Documento gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-    p.drawString(50, 35, "Sistema SST - Gerenciamento de Riscos Ocupacionais")
-
-    p.showPage()
-    p.save()
-
-    buffer.seek(0)
-    return make_response(buffer.getvalue(), 200, {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': f'inline; filename=recibo_{recibo.id}_{recibo.evento_tipo}.pdf'
-    })
 @app.route('/debug/respostas')
 @login_required
 def debug_respostas():
@@ -3342,7 +2755,16 @@ def remover_certificado_empresa():
     return redirect(url_for('meu_certificado_empresa'))
 
 #########################################################  MODELOS DE DOCUMENTOS PARA OS CLIENTES #########
-
+import os
+import json
+from datetime import datetime
+from werkzeug.utils import secure_filename
+from docx import Document
+from docx.shared import Inches
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+from flask import send_file, make_response
 
 # Configuração para upload de modelos
 UPLOAD_FOLDER_MODELOS = 'modelos_documentos'
@@ -3601,436 +3023,9 @@ def admin_required(f):
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
-
-####################################################  CONFIGURAÇÃO DO CERTIFICADO ESOCIAL ##########################
-@app.route('/config_certificado', methods=['GET', 'POST'])
-@login_required
-def config_certificado():
-    # Buscar a empresa do usuário atual
-    # CORREÇÃO: Usar session.get em vez de query.get
-    empresa = db.session.get(Empresa, current_user.empresa_id) if hasattr(current_user, 'empresa_id') else None
-
-    # Se não encontrar empresa pelo usuário, tenta buscar a primeira empresa
-    if not empresa:
-        empresa = Empresa.query.first()
-
-    # Se ainda não tem empresa, redireciona para criar
-    if not empresa:
-        flash('Cadastre uma empresa antes de configurar o certificado!', 'warning')
-        return redirect(url_for('create_empresa'))
-
-    if request.method == 'POST':
-        try:
-            certificado = request.files.get('certificado')
-            senha = request.form.get('senha')
-            ambiente = request.form.get('ambiente', '2')
-
-            if not certificado or not certificado.filename:
-                flash('Selecione um arquivo de certificado!', 'error')
-                return redirect(url_for('config_certificado'))
-
-            # Criar diretório se não existir
-            cert_dir = os.path.join('uploads', 'certificados')
-            os.makedirs(cert_dir, exist_ok=True)
-
-            # Nome do arquivo usando CNPJ da empresa
-            cnpj_limpo = ''.join(filter(str.isdigit, empresa.cnpj)) if empresa.cnpj else 'sem_cnpj'
-            filename = secure_filename(f"{cnpj_limpo}_{certificado.filename}")
-            filepath = os.path.join(cert_dir, filename)
-
-            # Salvar arquivo
-            certificado.save(filepath)
-
-            # Verificar se já existe configuração
-            config = ConfigCertificado.query.filter_by(empresa_id=empresa.id).first()
-
-            if config:
-                # Atualizar existente
-                config.certificado_pfx = filepath
-                config.senha = senha
-                config.ambiente = ambiente
-                config.data_config = datetime.utcnow()
-            else:
-                # Criar nova
-                config = ConfigCertificado(
-                    empresa_id=empresa.id,
-                    usuario_id=current_user.id,
-                    certificado_pfx=filepath,
-                    senha=senha,
-                    ambiente=ambiente
-                )
-                db.session.add(config)
-
-            db.session.commit()
-            flash('Certificado configurado com sucesso!', 'success')
-            return redirect(url_for('dashboard'))
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Erro ao configurar certificado: {str(e)}', 'error')
-            return redirect(url_for('config_certificado'))
-
-    # Buscar configuração existente
-    config = ConfigCertificado.query.filter_by(empresa_id=empresa.id).first()
-
-    return render_template('config_certificado.html',
-                           empresa=empresa,
-                           config=config,
-                           modo_envio=session.get('modo_envio', False))
-
-
-# ================= ROTAS DE psicossocial =================
-# ==================== AVALIAÇÃO PSICOSSOCIAL ====================
-
-@app.route('/clientes')
-@login_required
-def listar_clientes():
-    clientes = Cliente.query.order_by(Cliente.data_cadastro.desc()).all()
-    return render_template('clientes_list.html', clientes=clientes)
-
-
-@app.route('/clientes/novo', methods=['GET', 'POST'])
-@login_required
-def novo_cliente():
-    if request.method == 'POST':
-        email = request.form['email']
-
-        # Verifica se email já existe
-        cliente_existente = Cliente.query.filter_by(email=email).first()
-        if cliente_existente:
-            flash('Este email já está cadastrado!', 'danger')
-            return redirect(url_for('novo_cliente'))
-
-        cliente = Cliente(
-            nome=request.form['nome'],
-            email=email,
-            empresa=request.form.get('empresa', ''),
-            telefone=request.form.get('telefone', '')
-        )
-        db.session.add(cliente)
-        db.session.commit()
-        flash('Cliente cadastrado com sucesso!', 'success')
-        return redirect(url_for('listar_clientes'))
-
-    return render_template('cliente_form.html')
-
-@app.route('/avaliacao/nova/<int:cliente_id>', methods=['GET', 'POST'])
-@login_required
-def nova_avaliacao(cliente_id):
-    cliente = db.session.get(Cliente, cliente_id)
-    if not cliente:
-        flash('Cliente não encontrado', 'danger')
-        return redirect(url_for('listar_clientes'))
-
-    funcionarios = Funcionario.query.all()
-
-    if request.method == 'POST':
-        nome_funcionario = request.form.get('nome_funcionario')
-        cargo = request.form.get('cargo')
-        setor = request.form.get('setor')
-        email_funcionario = request.form.get('email_funcionario')
-
-        import secrets
-        token = secrets.token_urlsafe(32)
-
-        avaliacao = AvaliacaoPsicossocial(
-            cliente_id=cliente.id,
-            token=token,
-            nome_funcionario=nome_funcionario,
-            cargo=cargo,
-            setor=setor,
-            email_funcionario=email_funcionario,
-            status='pendente'
-        )
-        db.session.add(avaliacao)
-        db.session.commit()
-
-        # Gera o link
-        link = url_for('responder_avaliacao', token=token, _external=True)
-
-        # Salva na sessão para exibir na tela
-        session['ultimo_link'] = link
-        session['ultimo_funcionario'] = nome_funcionario
-
-        flash(f'Avaliação criada para {nome_funcionario}!', 'success')
-        return redirect(url_for('mostrar_link_avaliacao', id=avaliacao.id))
-
-    return render_template('avaliacao_form.html', cliente=cliente, funcionarios=funcionarios)
-
-
-@app.route('/avaliacao/link/<int:id>')
-@login_required
-def mostrar_link_avaliacao(id):
-    avaliacao = db.session.get(AvaliacaoPsicossocial, id)
-    if not avaliacao:
-        flash('Avaliação não encontrada', 'danger')
-        return redirect(url_for('listar_avaliacoes'))
-
-    link = url_for('responder_avaliacao', token=avaliacao.token, _external=True)
-
-    # Gera QR Code (opcional)
-    try:
-        import qrcode
-        from io import BytesIO
-        import base64
-
-        qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(link)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-
-        buffer = BytesIO()
-        img.save(buffer, format="PNG")
-        qr_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        qr_code = f"data:image/png;base64,{qr_base64}"
-    except:
-        qr_code = None
-
-    return render_template('mostrar_link.html',
-                           avaliacao=avaliacao,
-                           link=link,
-                           qr_code=qr_code)
-
-
-
-
-@app.route('/avaliacao/enviar/<int:id>')
-@login_required
-def reenviar_link_avaliacao(id):
-    avaliacao = db.session.get(AvaliacaoPsicossocial, id)
-    if not avaliacao:
-        flash('Avaliação não encontrada', 'danger')
-        return redirect(url_for('listar_avaliacoes'))
-
-    cliente = db.session.get(Cliente, avaliacao.cliente_id)
-    enviar_link_avaliacao(avaliacao, cliente)
-    flash(f'Link reenviado para {avaliacao.email_funcionario}', 'success')
-    return redirect(url_for('listar_avaliacoes'))
-
-
-def enviar_link_avaliacao(avaliacao, cliente):
-    link = url_for('responder_avaliacao', token=avaliacao.token, _external=True)
-
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Avaliação Psicossocial</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; }}
-            .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-            .header {{ background-color: #4CAF50; color: white; padding: 20px; text-align: center; }}
-            .content {{ padding: 20px; background-color: #f9f9f9; }}
-            .button {{ display: inline-block; padding: 12px 24px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
-            .footer {{ margin-top: 20px; text-align: center; font-size: 12px; color: #666; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h2>Avaliação Psicossocial</h2>
-            </div>
-            <div class="content">
-                <h3>Olá {avaliacao.nome_funcionario},</h3>
-                <p>A empresa <strong>{cliente.empresa or cliente.nome}</strong> solicitou sua participação na avaliação psicossocial.</p>
-                <p><strong>Cargo:</strong> {avaliacao.cargo}<br>
-                <strong>Setor:</strong> {avaliacao.setor}</p>
-                <p>Por favor, clique no botão abaixo para responder o questionário:</p>
-                <p style="text-align: center;">
-                    <a href="{link}" class="button">Responder Avaliação</a>
-                </p>
-                <p>Este link é único e válido para uma única resposta.</p>
-                <p><small>Se o botão não funcionar, copie e cole o link abaixo:</small></p>
-                <p><small>{link}</small></p>
-            </div>
-            <div class="footer">
-                <p>Este é um email automático, por favor não responda.</p>
-                <p>Sistema SST - Gerenciamento de Riscos Ocupacionais</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-    try:
-        from flask_mail import Message
-        msg = Message(
-            subject=f"Avaliação Psicossocial - {avaliacao.nome_funcionario}",
-            recipients=[avaliacao.email_funcionario],
-            html=html_content
-        )
-        mail.send(msg)
-        avaliacao.email_enviado = True
-        avaliacao.data_envio = datetime.now()
-        db.session.commit()
-        print(f"✅ Email enviado para {avaliacao.email_funcionario}")
-    except Exception as e:
-        print(f"❌ Erro ao enviar email: {e}")
-
-
-@app.route('/avaliacao/responder/<token>', methods=['GET', 'POST'])
-def responder_avaliacao(token):
-    avaliacao = AvaliacaoPsicossocial.query.filter_by(token=token, status='pendente').first()
-
-    if not avaliacao:
-        flash('Link inválido ou questionário já respondido!', 'danger')
-        return redirect(url_for('index'))
-
-    if request.method == 'POST':
-        # Coleta as respostas
-        respostas = {}
-        for key, value in request.form.items():
-            if key.startswith('q'):
-                respostas[key] = int(value) if value.isdigit() else value
-
-        # Calcula pontuação
-        pontuacao_total = sum([int(v) for v in respostas.values() if isinstance(v, int)])
-
-        # Determina nível de risco
-        if pontuacao_total <= 20:
-            nivel_risco = 'Baixo'
-        elif pontuacao_total <= 35:
-            nivel_risco = 'Médio'
-        elif pontuacao_total <= 50:
-            nivel_risco = 'Alto'
-        else:
-            nivel_risco = 'Crítico'
-
-        import json
-        avaliacao.respostas = json.dumps(respostas, ensure_ascii=False)
-        avaliacao.pontuacao_total = pontuacao_total
-        avaliacao.nivel_risco = nivel_risco
-        avaliacao.status = 'respondido'
-        avaliacao.data_resposta = datetime.now()
-        db.session.commit()
-
-        flash('Avaliação concluída com sucesso!', 'success')
-        return redirect(url_for('ver_resultado', id=avaliacao.id))
-
-    return render_template('questionario_psicossocial.html', avaliacao=avaliacao)
-
-
-@app.route('/avaliacao/resultado/<int:id>')
-def ver_resultado(id):
-    avaliacao = db.session.get(AvaliacaoPsicossocial, id)
-    if not avaliacao:
-        flash('Avaliação não encontrada', 'danger')
-        return redirect(url_for('index'))
-
-    return render_template('resultado_avaliacao.html', avaliacao=avaliacao)
-
-
-@app.route('/avaliacao/pdf/<int:id>')
-def gerar_pdf_resultado(id):
-    from reportlab.lib.pagesizes import A4
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.utils import simpleSplit
-    from io import BytesIO
-    from flask import make_response
-    import json
-
-    avaliacao = db.session.get(AvaliacaoPsicossocial, id)
-    if not avaliacao:
-        flash('Avaliação não encontrada', 'danger')
-        return redirect(url_for('index'))
-
-    respostas = json.loads(avaliacao.respostas) if avaliacao.respostas else {}
-
-    perguntas = {
-        'q1': '1. Como você avalia seu nível de estresse no trabalho?',
-        'q2': '2. Você sente que tem controle sobre suas atividades?',
-        'q3': '3. Como você avalia o apoio da sua liderança?',
-        'q4': '4. Você se sente sobrecarregado com a quantidade de trabalho?',
-        'q5': '5. Como você avalia o relacionamento com seus colegas?',
-        'q6': '6. Você tem autonomia para tomar decisões no seu trabalho?',
-        'q7': '7. Como você avalia o reconhecimento pelo seu trabalho?',
-        'q8': '8. Você consegue conciliar trabalho e vida pessoal?',
-        'q9': '9. Você tem sintomas físicos relacionados ao trabalho?',
-        'q10': '10. Como você avalia sua satisfação geral no trabalho?'
-    }
-
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, height - 50, "RELATÓRIO DE AVALIAÇÃO PSICOSSOCIAL")
-
-    p.setFont("Helvetica", 10)
-    p.drawString(50, height - 70, f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-    p.line(50, height - 75, width - 50, height - 75)
-
-    y = height - 100
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y, "DADOS DO FUNCIONÁRIO")
-    y -= 20
-    p.setFont("Helvetica", 10)
-    p.drawString(50, y, f"Nome: {avaliacao.nome_funcionario}")
-    y -= 15
-    p.drawString(50, y, f"Cargo: {avaliacao.cargo}")
-    y -= 15
-    p.drawString(50, y, f"Setor: {avaliacao.setor}")
-    y -= 25
-
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y, "RESPOSTAS DO QUESTIONÁRIO")
-    y -= 20
-
-    p.setFont("Helvetica", 9)
-    for key, pergunta in perguntas.items():
-        valor = respostas.get(key, 'Não respondido')
-        p.drawString(50, y, f"{pergunta}: {valor}")
-        y -= 15
-        if y < 50:
-            p.showPage()
-            y = height - 50
-            p.setFont("Helvetica", 9)
-
-    y -= 25
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y, f"PONTUAÇÃO TOTAL: {avaliacao.pontuacao_total} pontos")
-    y -= 20
-    p.drawString(50, y, f"NÍVEL DE RISCO: {avaliacao.nivel_risco}")
-
-    y -= 30
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y, "RECOMENDAÇÕES:")
-    y -= 20
-    p.setFont("Helvetica", 10)
-
-    recomendacoes = {
-        'Baixo': ['- Manter as boas práticas atuais', '- Realizar acompanhamento anual'],
-        'Médio': ['- Implementar programa de qualidade de vida', '- Oferecer pausas ativas',
-                  '- Realizar acompanhamento semestral'],
-        'Alto': ['- Intervenção no ambiente de trabalho', '- Oferecer apoio psicológico',
-                 '- Acompanhamento trimestral'],
-        'Crítico': ['- INTERVENÇÃO URGENTE NECESSÁRIA!', '- Afastamento temporário se necessário',
-                    '- Acompanhamento psicológico semanal', '- Reavaliação em 30 dias']
-    }
-
-    for rec in recomendacoes[avaliacao.nivel_risco]:
-        p.drawString(50, y, rec)
-        y -= 15
-
-    p.save()
-    buffer.seek(0)
-
-    return make_response(buffer.getvalue(), 200, {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': f'inline; filename=avaliacao_{avaliacao.id}.pdf'
-    })
-
-
-@app.route('/avaliacoes')
-@login_required
-def listar_avaliacoes():
-    avaliacoes = AvaliacaoPsicossocial.query.order_by(AvaliacaoPsicossocial.created_at.desc()).all()
-    return render_template('avaliacoes_list.html', avaliacoes=avaliacoes)
-
-@app.route('/avaliacao/short/<token>')
-def avaliacao_short(token):
-    return redirect(url_for('responder_avaliacao', token=token))
 # ================= EXECUÇÃO =================
 if __name__ == '__main__':
-    app.run()
+    with app.app_context():
+        db.create_all()
+        init_db()
+    app.run(debug=True)

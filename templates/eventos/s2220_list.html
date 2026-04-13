@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block content %}
 <div class="card">
@@ -27,7 +27,7 @@
                     <tr>
                         <td>{{ evento.id }}</td>
                         <td>{{ evento.funcionario.nome }}</td>
-                        <td>{{ evento.data_aso.strftime('%d/%m/%Y') }}</td>  <!-- CORRIGIDO: data_aso -->
+                        <td>{{ evento.data_aso.strftime('%d/%m/%Y') }}</td>
                         <td>{{ evento.crm_medico }}/{{ evento.uf_crm }}</td>
                         <td>
                             {% if evento.status == 'enviado' %}
@@ -38,23 +38,13 @@
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
-                                <a href="{{ url_for('view_xml_s2220', id=evento.id) }}" class="btn btn-info" target="_blank">📄 XML</a>
-                                <a href="{{ url_for('download_xml_s2220', id=evento.id) }}" class="btn btn-secondary">⬇️ XML</a>
-                                <a href="{{ url_for('download_pdf_s2220', id=evento.id) }}" class="btn btn-danger">📑 PDF</a>
-                                <a href="{{ url_for('edit_s2220', id=evento.id) }}" class="btn btn-warning">✏️ Editar</a>
-                                <a href="{{ url_for('delete_s2220', id=evento.id) }}" class="btn btn-danger" onclick="return confirm('Confirmar exclusão?')">🗑️ Excluir</a>
-
+                                <a href="{{ url_for('view_xml_s2220', id=evento.id) }}" class="btn btn-info" target="_blank">XML</a>
+                                <a href="{{ url_for('download_xml_s2220', id=evento.id) }}" class="btn btn-secondary">Baixar XML</a>
+                                <a href="{{ url_for('download_pdf_s2220', id=evento.id) }}" class="btn btn-danger">PDF</a>
+                                <a href="{{ url_for('edit_s2220', id=evento.id) }}" class="btn btn-warning">Editar</a>
+                                <a href="{{ url_for('delete_s2220', id=evento.id) }}" class="btn btn-danger" onclick="return confirm('Confirmar exclusão?')">Excluir</a>
                                 {% if evento.status != 'enviado' %}
-                                <a href="{{ url_for('enviar_s2220', id=evento.id) }}" class="btn btn-success"
-                                   onclick="return confirm('Enviar este evento para o eSocial?')">
-                                    📤 Enviar
-                                </a>
-                                {% endif %}
-
-                                {% if evento.recibo %}
-                                <button class="btn btn-info" onclick="alert('Recibo: {{ evento.recibo }}')">
-                                    📋 Recibo
-                                </button>
+                                <a href="{{ url_for('enviar_s2220', id=evento.id) }}" class="btn btn-success" onclick="return confirm('Enviar este evento para o eSocial?')">Enviar</a>
                                 {% endif %}
                             </div>
                         </td>

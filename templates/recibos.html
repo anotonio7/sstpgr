@@ -1,38 +1,19 @@
+@'
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="card">
+<div class="container mt-4">
+    <h2>
+        <i class="bi bi-receipt"></i> Histórico de Envios - Recibos do eSocial
+    </h2>
+
+    <div class="card mt-3">
         <div class="card-header bg-primary text-white">
-            <h4>
-                <i class="bi bi-receipt"></i> Histórico de Envios - Recibos do eSocial
-            </h4>
+            <h5>Todos os eventos</h5>
         </div>
         <div class="card-body">
-            <!-- Barra de pesquisa e filtros -->
-            <div class="row mb-3">
-                <div class="col-md-4">
-                    <input type="text" id="busca" class="form-control" placeholder="🔍 Buscar por funcionário ou XML..." onkeyup="buscar()">
-                </div>
-                <div class="col-md-3">
-                    <select id="filtroTipo" class="form-select" onchange="filtrarEventos()">
-                        <option value="todos">Todos os eventos</option>
-                        <option value="S-2220">S-2220 (ASO)</option>
-                        <option value="S-2221">S-2221 (Toxicológico)</option>
-                        <option value="S-2210">S-2210 (CAT)</option>
-                        <option value="S-2240">S-2240 (Riscos)</option>
-                    </select>
-                </div>
-                <div class="col-md-5 text-end">
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-                        <i class="bi bi-arrow-left"></i> Voltar
-                    </a>
-                </div>
-            </div>
-
-            {% if recibos %}
             <div class="table-responsive">
-                <table class="table table-striped table-hover" id="tabelaRecibos">
+                <table class="table table-striped table-hover">
                     <thead class="table-dark">
                         <tr>
                             <th>ID</th>
@@ -46,250 +27,93 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for rec in recibos %}
+                        {% for recibo in recibos %}
                         <tr>
-                            <td>{{ rec.id }}</td>
+                            <td>{{ recibo.id }}</td>
                             <td>
-                                <span class="badge bg-info">{{ rec.tipo }}</span>
+                                <span class="badge {% if recibo.evento_tipo == 'S-2220' %}bg-success
+                                                      {% elif recibo.evento_tipo == 'S-2210' %}bg-warning
+                                                      {% elif recibo.evento_tipo == 'S-2221' %}bg-info
+                                                      {% elif recibo.evento_tipo == 'S-2240' %}bg-danger
+                                                      {% else %}bg-secondary{% endif %}">
+                                    {{ recibo.evento_tipo }}
+                                </span>
                             </td>
-                            <td>{{ rec.funcionario }}</td>
+                            <td>{{ recibo.funcionario_nome if recibo.funcionario_nome else 'N/A' }}</td>
+                            <td><small>{{ recibo.nome_xml }}</small></td>
+                            <td>{{ recibo.data_envio.strftime('%d/%m/%Y %H:%M:%S') if recibo.data_envio else 'N/A' }}</td>
                             <td>
-                                <code>{{ rec.nome_xml }}</code>
-                            </td>
-                            <td>
-                                {% if rec.data_envio %}
-                                    {{ rec.data_envio.strftime('%d/%m/%Y %H:%M:%S') }}
-                                {% else %}
-                                    <span class="text-muted">Não informada</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if rec.status == 'enviado' %}
+                                {% if recibo.status == 'enviado' %}
                                     <span class="badge bg-success">✓ Enviado</span>
-                                {% elif rec.status == 'erro' %}
-                                    <span class="badge bg-danger">✗ Erro</span>
                                 {% else %}
-                                    <span class="badge bg-warning">⏳ Pendente</span>
+                                    <span class="badge bg-danger">✗ Erro</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <button type="button" class="btn btn-sm btn-info"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modalRecibo{{ loop.index }}">
-                                    <i class="bi bi-eye"></i> Ver
-                                </button>
+                                {% if recibo.recibo %}
+                                    <small>{{ recibo.recibo[:50] }}{% if recibo.recibo|length > 50 %}...{% endif %}</small>
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
                             </td>
                             <td>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <button class="btn btn-secondary"
-                                            onclick="copiarRecibo('{{ rec.recibo }}')">
-                                        <i class="bi bi-copy"></i>
-                                    </button>
-                                    <a href="{{ url_for('download_recibo_pdf', tipo=rec.tipo_url, id=rec.id) }}"
-                                       class="btn btn-danger"
-                                       target="_blank">
-                                        <i class="bi bi-file-pdf"></i> PDF
-                                    </a>
-                                </div>
+                                {% if recibo.nome_xml %}
+                                <a href="{{ url_for('download_recibo_xml', id=recibo.id) }}" class="btn btn-sm btn-secondary">
+                                    <i class="bi bi-download"></i> XML
+                                </a>
+                                {% endif %}
                             </td>
                         </tr>
-
-                        <!-- Modal para visualizar recibo -->
-                        <div class="modal fade" id="modalRecibo{{ loop.index }}" tabindex="-1">
-                            <div class="modal-dialog modal-lg">
-                                <div class="modal-content">
-                                    <div class="modal-header bg-info text-white">
-                                        <h5 class="modal-title">
-                                            <i class="bi bi-receipt"></i> Recibo - {{ rec.tipo }}
-                                        </h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <strong>Evento:</strong> {{ rec.tipo }}<br>
-                                                <strong>Funcionário:</strong> {{ rec.funcionario }}<br>
-                                                <strong>CPF:</strong> {{ rec.cpf if rec.cpf else 'Não informado' }}
-                                            </div>
-                                            <div class="col-md-6">
-                                                <strong>Arquivo:</strong> <code>{{ rec.nome_xml }}</code><br>
-                                                <strong>Data de Envio:</strong> {{ rec.data_envio.strftime('%d/%m/%Y %H:%M:%S') if rec.data_envio else 'N/A' }}<br>
-                                                <strong>Status:</strong>
-                                                {% if rec.status == 'enviado' %}
-                                                    <span class="badge bg-success">Enviado com sucesso</span>
-                                                {% elif rec.status == 'erro' %}
-                                                    <span class="badge bg-danger">Erro no envio</span>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        <hr>
-                                        <div class="mb-3">
-                                            <strong>Recibo do eSocial:</strong>
-                                            <textarea class="form-control font-monospace" rows="10" readonly style="font-size: 12px;">{{ rec.recibo }}</textarea>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button class="btn btn-secondary" onclick="copiarRecibo('{{ rec.recibo }}')">
-                                            <i class="bi bi-copy"></i> Copiar Recibo
-                                        </button>
-                                        <a href="{{ url_for('download_recibo_pdf', tipo=rec.tipo_url, id=rec.id) }}"
-                                           class="btn btn-danger" target="_blank">
-                                            <i class="bi bi-file-pdf"></i> Baixar PDF
-                                        </a>
-                                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Fechar</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">
+                                Nenhum recibo encontrado. Envie um evento para aparecer aqui.
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
 
-            <!-- Resumo estatístico -->
-            <div class="row mt-4">
-                <div class="col-md-3">
-                    <div class="card bg-success text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Total de Envios</h5>
-                            <h2>{{ recibos|length }}</h2>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-info text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Último Envio</h5>
-                            <h6>{{ recibos[0].data_envio.strftime('%d/%m/%Y') if recibos else 'Nenhum' }}</h6>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-primary text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Enviados com Sucesso</h5>
-                            <h2>{{ recibos|selectattr('status', 'equalto', 'enviado')|list|length }}</h2>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-warning text-dark">
-                        <div class="card-body">
-                            <h5 class="card-title">Tipos de Evento</h5>
-                            {% set s2220_count = 0 %}
-                            {% set s2240_count = 0 %}
-                            {% for rec in recibos %}
-                                {% if 'S-2220' in rec.tipo %}
-                                    {% set s2220_count = s2220_count + 1 %}
-                                {% elif 'S-2240' in rec.tipo %}
-                                    {% set s2240_count = s2240_count + 1 %}
-                                {% endif %}
-                            {% endfor %}
-                            <h6>S-2220: {{ s2220_count }} | S-2240: {{ s2240_count }}</h6>
-                        </div>
-                    </div>
+    <div class="row mt-4">
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5>Total de Envios</h5>
+                    <h2>{{ recibos|length }}</h2>
                 </div>
             </div>
-
-            {% else %}
-            <div class="alert alert-warning">
-                <i class="bi bi-exclamation-triangle"></i>
-                Nenhum recibo encontrado. Envie um evento para o eSocial para visualizar os recibos.
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5>Último Envio</h5>
+                    <h6>{{ recibos[0].data_envio.strftime('%d/%m/%Y') if recibos else 'N/A' }}</h6>
+                </div>
             </div>
-            {% endif %}
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5>Enviados com Sucesso</h5>
+                    <h2>{{ recibos|selectattr('status', 'equalto', 'enviado')|list|length }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <h5>Tipos de Evento</h5>
+                    <h6>
+                        S-2220: {{ recibos|selectattr('evento_tipo', 'equalto', 'S-2220')|list|length }} |
+                        S-2240: {{ recibos|selectattr('evento_tipo', 'equalto', 'S-2240')|list|length }}
+                    </h6>
+                </div>
+            </div>
         </div>
     </div>
 </div>
-
-<script>
-function copiarRecibo(recibo) {
-    navigator.clipboard.writeText(recibo).then(function() {
-        var tooltip = document.createElement('div');
-        tooltip.innerHTML = '✓ Recibo copiado!';
-        tooltip.style.position = 'fixed';
-        tooltip.style.top = '20px';
-        tooltip.style.right = '20px';
-        tooltip.style.backgroundColor = '#28a745';
-        tooltip.style.color = 'white';
-        tooltip.style.padding = '10px 20px';
-        tooltip.style.borderRadius = '5px';
-        tooltip.style.zIndex = '9999';
-        document.body.appendChild(tooltip);
-
-        setTimeout(function() {
-            tooltip.remove();
-        }, 2000);
-    }).catch(function(err) {
-        alert('Erro ao copiar recibo: ' + err);
-    });
-}
-
-function filtrarEventos() {
-    const filtro = document.getElementById('filtroTipo').value;
-    const rows = document.querySelectorAll('#tabelaRecibos tbody tr');
-
-    rows.forEach(row => {
-        const tipoCell = row.cells[1];
-        if (filtro === 'todos' || tipoCell.innerText.includes(filtro)) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    });
-}
-
-function buscar() {
-    const termo = document.getElementById('busca').value.toLowerCase();
-    const rows = document.querySelectorAll('#tabelaRecibos tbody tr');
-
-    rows.forEach(row => {
-        const texto = row.innerText.toLowerCase();
-        if (texto.includes(termo)) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    });
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('busca').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            buscar();
-        }
-    });
-});
-</script>
-
-<style>
-    .font-monospace {
-        font-family: 'Courier New', monospace;
-        font-size: 12px;
-        background-color: #f8f9fa;
-    }
-
-    .table td {
-        vertical-align: middle;
-    }
-
-    code {
-        font-size: 12px;
-        background-color: #f8f9fa;
-        padding: 2px 5px;
-        border-radius: 3px;
-    }
-
-    .btn-group {
-        display: flex;
-        gap: 5px;
-    }
-
-    .card {
-        transition: transform 0.2s;
-    }
-
-    .card:hover {
-        transform: translateY(-3px);
-    }
-</style>
 {% endblock %}
+'@ | Out-File -FilePath templates\recibos_list.html -Encoding UTF8

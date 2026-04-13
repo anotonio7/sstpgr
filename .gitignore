@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.env
+venv/
+.venv/
+env/
+ENV/
+
+# Flask
+instance/
+.DS_Store
+
+# Banco de dados
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Arquivos tempor?rios
+*.tmp
+*.bak
+*.swp
+
+# Configura??es locais
+config_local.py
