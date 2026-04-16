@@ -1,5 +1,20 @@
-instance/
+# Banco de dados
 *.db
+instance/
+
+# Uploads de modelos (arquivos gerados pelos usuários)
+modelos_documentos/
+
+# Scripts auxiliares locais
+verificar_admin.py
+migrate_db.py
+reset_db.py
+
+# Python
 __pycache__/
 *.pyc
-instance/certs/
+.venv/
+
+# IDE
+.vscode/
+.idea/
