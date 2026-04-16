@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2><i class="bi bi-plus-circle"></i> Nova Entrega de EPI</h2>
+    <hr>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label for="funcionario_id" class="form-label">Funcionário</label>
+            <select name="funcionario_id" id="funcionario_id" class="form-select" required>
+                <option value="">Selecione...</option>
+                {% for func in funcionarios %}
+                <option value="{{ func.id }}">{{ func.nome }} ({{ func.cpf }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="epi_nome" class="form-label">Nome do EPI</label>
+            <input type="text" name="epi_nome" id="epi_nome" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="quantidade" class="form-label">Quantidade</label>
+            <input type="number" name="quantidade" id="quantidade" class="form-control" value="1" min="1" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="data_entrega" class="form-label">Data de Entrega</label>
+            <input type="date" name="data_entrega" id="data_entrega" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="data_validade" class="form-label">Data de Validade (opcional)</label>
+            <input type="date" name="data_validade" id="data_validade" class="form-control">
+        </div>
+
+        <div class="mb-3">
+            <label for="observacoes" class="form-label">Observações</label>
+            <textarea name="observacoes" id="observacoes" class="form-control" rows="3"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Salvar Entrega</button>
+        <a href="{{ url_for('listar_epi') }}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

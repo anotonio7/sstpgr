@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ficha de Entrega de EPI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            background: #e9ecef;
+            padding: 40px 20px;
+        }
+
+        /* Container principal – simula uma folha A4 */
+        .documento {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            padding: 30px 35px 40px 35px;
+        }
+
+        /* Cabeçalho com área para logo */
+        .cabecalho {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #0d6efd;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        .logo-area {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .logo-area small {
+            font-size: 12px;
+            font-weight: normal;
+            color: #6c757d;
+            display: block;
+        }
+        .titulo-documento {
+            text-align: right;
+        }
+        .titulo-documento h1 {
+            font-size: 22px;
+            color: #212529;
+            margin: 0;
+        }
+        .titulo-documento p {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        /* Informações da empresa */
+        .info-empresa {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            border-left: 4px solid #0d6efd;
+        }
+        .info-empresa strong {
+            color: #0d6efd;
+        }
+
+        /* Tabela de dados */
+        .tabela-dados {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .tabela-dados tr {
+            border-bottom: 1px solid #dee2e6;
+        }
+        .tabela-dados td {
+            padding: 12px 8px;
+            vertical-align: top;
+        }
+        .tabela-dados td:first-child {
+            font-weight: 600;
+            width: 30%;
+            background-color: #f8f9fa;
+        }
+        .tabela-dados td:last-child {
+            background-color: white;
+        }
+
+        /* Destaque para EPI */
+        .epi-destaque {
+            background-color: #e7f1ff;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+
+        /* Área de assinatura */
+        .assinatura-area {
+            margin-top: 45px;
+            padding-top: 20px;
+            border-top: 2px dashed #adb5bd;
+            text-align: center;
+        }
+        .declaracao {
+            font-style: italic;
+            margin-bottom: 35px;
+            color: #495057;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .linha-assinatura {
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .assinatura-item {
+            flex: 1;
+            text-align: center;
+        }
+        .linha {
+            border-top: 1px solid #212529;
+            margin-top: 40px;
+            margin-bottom: 8px;
+            width: 100%;
+        }
+        .assinatura-item p {
+            font-size: 12px;
+            color: #6c757d;
+            margin: 5px 0;
+        }
+
+        /* Rodapé */
+        .rodape {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 10px;
+            color: #adb5bd;
+            border-top: 1px solid #dee2e6;
+            padding-top: 15px;
+        }
+
+        /* Botão de impressão */
+        .btn-imprimir {
+            text-align: center;
+            margin-top: 30px;
+        }
+        button {
+            background: #0d6efd;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 14px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        button:hover {
+            background: #0b5ed7;
+            transform: scale(1.02);
+        }
+
+        /* Estilos para impressão */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            .documento {
+                box-shadow: none;
+                border-radius: 0;
+                padding: 20px;
+                max-width: 100%;
+            }
+            .btn-imprimir {
+                display: none;
+            }
+            .assinatura-area {
+                margin-top: 70px;
+            }
+            .linha-assinatura {
+                margin-top: 40px;
+            }
+            .cabecalho {
+                border-bottom-width: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="documento">
+        <!-- Cabeçalho com espaço para logo -->
+        <div class="cabecalho">
+            <div class="logo-area">
+                🛡️ Sistema SST
+                <small>Gestão de Saúde e Segurança</small>
+            </div>
+            <div class="titulo-documento">
+                <h1>Ficha de Entrega de EPI</h1>
+                <p>Documento de controle e responsabilidade</p>
+            </div>
+        </div>
+
+        <!-- Dados da empresa -->
+        <div class="info-empresa">
+            <strong>{{ empresa.nome if empresa else 'Empresa' }}</strong> &nbsp;|&nbsp;
+            CNPJ: {{ empresa.cnpj if empresa else '---' }} &nbsp;|&nbsp;
+            Data da emissão: {{ data_atual.split()[0] if data_atual else '___/___/_____' }}
+        </div>
+
+        <!-- Dados da entrega -->
+        <table class="tabela-dados">
+            <tr>
+                <td>👤 Funcionário</td>
+                <td><strong>{{ funcionario.nome }}</strong></td>
+            </tr>
+            <tr>
+                <td>📄 CPF</td>
+                <td>{{ funcionario.cpf }}</td>
+            </tr>
+            <tr>
+                <td>💼 Cargo/Função</td>
+                <td>{{ funcionario.cargo if funcionario.cargo else '---' }}</td>
+            </tr>
+            <tr class="epi-destaque">
+                <td>🛡️ EPI entregue</td>
+                <td><strong>{{ entrega.epi_nome }}</strong></td>
+            </tr>
+            <tr>
+                <td>🔢 Quantidade</td>
+                <td>{{ entrega.quantidade }} unidade(s)</td>
+            </tr>
+            <tr>
+                <td>📅 Data da entrega</td>
+                <td>{{ entrega.data_entrega.strftime('%d/%m/%Y') }}</td>
+            </tr>
+            <tr>
+                <td>⏳ Data de validade</td>
+                <td>{{ entrega.data_validade.strftime('%d/%m/%Y') if entrega.data_validade else 'Não definida' }}</td>
+            </tr>
+            <tr>
+                <td>📝 Observações</td>
+                <td>{{ entrega.observacoes or '---' }}</td>
+            </tr>
+        </table>
+
+        <!-- Área de assinatura -->
+        <div class="assinatura-area">
+            <div class="declaracao">
+                Declaro que recebi o(s) Equipamento(s) de Proteção Individual (EPI) acima descrito(s),
+                comprometendo-me a utilizá-lo(s) corretamente, zelar pela sua conservação e comunicar
+                imediatamente qualquer dano ou extravio, conforme orientações de segurança da empresa.
+            </div>
+            <div class="linha-assinatura">
+                <div class="assinatura-item">
+                    <div class="linha"></div>
+                    <p>{{ funcionario.nome }}</p>
+                    <p><strong>Assinatura do funcionário</strong></p>
+                </div>
+                <div class="assinatura-item">
+                    <div class="linha"></div>
+                    <p>Representante da empresa</p>
+                    <p><strong>Assinatura do responsável</strong></p>
+                </div>
+            </div>
+            <p style="margin-top: 20px; font-size: 12px; color: #6c757d;">Data da assinatura: ___/___/_____</p>
+        </div>
+
+        <!-- Rodapé -->
+        <div class="rodape">
+            Documento válido como comprovante de entrega de EPI. Guarde este documento para futuras referências.
+        </div>
+
+        <!-- Botão de impressão (só aparece na tela) -->
+        <div class="btn-imprimir">
+            <button onclick="window.print()">🖨️ Imprimir / Salvar como PDF</button>
+        </div>
+    </div>
+</body>
+</html>

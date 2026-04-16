@@ -42,7 +42,7 @@ from datetime import datetime, timedelta
 import hashlib
 import secrets
 from flask_mail import Mail, Message  # ← ADICIONE ESTA LINHA
-
+from models import EPIEntrega, Funcionario  # junto com seus outros modelos
 # ... resto das importações
 # ================= IMPORTAÇÕES DOS MODELOS =================
 from models import (
@@ -76,9 +76,9 @@ from esocial_utils import (
 # ================= INICIALIZAÇÃO DO FLASK =================
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sua-chave-secreta-aqui'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/sst2.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
+# Configuração do domínio para links externos
 # Inicializar banco de dados
 db.init_app(app)
 
@@ -175,7 +175,7 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('instance/sst2.db')
     c = conn.cursor()
     c.execute("SELECT id, email, nome, tipo FROM usuarios WHERE id = ?", (user_id,))
     usuario = c.fetchone()
@@ -199,7 +199,7 @@ def admin_required(f):
 
 # ================= FUNÇÕES DE USUÁRIO =================
 def init_db():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('instance/sst2.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -254,7 +254,7 @@ def login():
         senha = request.form['password']
         senha_hash = hashlib.sha256(senha.encode()).hexdigest()
 
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect('instance/sst2.db')
         c = conn.cursor()
         c.execute("SELECT id, email, nome, tipo FROM usuarios WHERE email = ? AND senha = ?",
                   (email, senha_hash))
@@ -293,7 +293,7 @@ def registro():
 
         senha_hash = hashlib.sha256(senha.encode()).hexdigest()
 
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect('instance/sst2.db')
         c = conn.cursor()
         try:
             c.execute("INSERT INTO usuarios (email, senha, nome, tipo) VALUES (?, ?, ?, 'cliente')",
@@ -314,7 +314,7 @@ def recuperar_senha():
     if request.method == 'POST':
         email = request.form['email']
 
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect('instance/sst2.db')
         c = conn.cursor()
         c.execute("SELECT id FROM usuarios WHERE email = ?", (email,))
         usuario = c.fetchone()
@@ -340,7 +340,7 @@ def recuperar_senha():
 
 @app.route('/redefinir-senha/<token>', methods=['GET', 'POST'])
 def redefinir_senha(token):
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('instance/sst2.db')
     c = conn.cursor()
     c.execute("SELECT id FROM usuarios WHERE reset_token = ? AND reset_token_expira > datetime('now')", (token,))
     usuario = c.fetchone()
@@ -408,7 +408,7 @@ def dashboard():
 @app.route('/admin/usuarios')
 @admin_required
 def admin_usuarios():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('instance/sst2.db')
     c = conn.cursor()
     c.execute("SELECT id, email, nome, tipo FROM usuarios ORDER BY id")
     usuarios = c.fetchall()
@@ -423,7 +423,7 @@ def admin_excluir_usuario(usuario_id):
         flash('Não pode excluir a si mesmo', 'danger')
         return redirect(url_for('admin_usuarios'))
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('instance/sst2.db')
     c = conn.cursor()
     c.execute("DELETE FROM usuarios WHERE id = ?", (usuario_id,))
     conn.commit()
@@ -435,7 +435,7 @@ def admin_excluir_usuario(usuario_id):
 @app.route('/admin/usuario/<int:usuario_id>/tornar-admin')
 @admin_required
 def admin_tornar_admin(usuario_id):
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('instance/sst2.db')
     c = conn.cursor()
     c.execute("UPDATE usuarios SET tipo = 'admin' WHERE id = ?", (usuario_id,))
     conn.commit()
@@ -451,7 +451,7 @@ def admin_tornar_cliente(usuario_id):
         flash('Não pode rebaixar a si mesmo', 'danger')
         return redirect(url_for('admin_usuarios'))
 
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('instance/sst2.db')
     c = conn.cursor()
     c.execute("UPDATE usuarios SET tipo = 'cliente' WHERE id = ?", (usuario_id,))
     conn.commit()
@@ -613,35 +613,37 @@ def create_funcionario():
     empresas = Empresa.query.all()
     return render_template('funcionario/create.html', empresas=empresas)
 
-@app.route('/funcionario/edit/<int:id>', methods=['POST'])
+
+@app.route('/funcionario/edit/<int:id>', methods=['GET', 'POST'])  # <-- IMPORTANTE: tem que ter GET e POST
 def edit_funcionario(id):
-    f = Funcionario.query.get_or_404(id)
-    f.nome = request.form['nome']
-    f.cpf = request.form['cpf']
-    f.matricula_esocial = request.form['matricula_esocial']
-    f.cbo = request.form['cbo']
-    f.nascimento = datetime.strptime(request.form['nascimento'], '%Y-%m-%d').date() if request.form[
-        'nascimento'] else None
-    f.admissao = datetime.strptime(request.form['admissao'], '%Y-%m-%d').date() if request.form['admissao'] else None
-    f.funcao = request.form['funcao']
-    f.empresa_id = request.form['empresa_id']
+    funcionario = Funcionario.query.get_or_404(id)
 
-    if not f.cbo.isdigit() or len(f.cbo) != 6:
-        return "CBO inválido. Deve conter 6 dígitos.", 400
+    if request.method == 'POST':
+        # Processar o formulário (atualizar)
+        funcionario.nome = request.form['nome']
+        funcionario.cpf = request.form['cpf']
+        funcionario.matricula_esocial = request.form.get('matricula_esocial')
+        funcionario.cbo = request.form['cbo']
+        funcionario.funcao = request.form['funcao']
+        funcionario.empresa_id = request.form['empresa_id']
 
-    db.session.commit()
-    return redirect(url_for('list_funcionarios'))
+        db.session.commit()
+        flash('Funcionário atualizado com sucesso!', 'success')
+        return redirect(url_for('list_funcionarios'))
+
+    # Se for GET, mostrar o formulário
+    empresas = Empresa.query.all()
+    return render_template('funcionario/edit.html', funcionario=funcionario, empresas=empresas)
 
 
-@app.route('/funcionario/delete/<int:id>')
-@login_required
+@app.route('/funcionario/delete/<int:id>', methods=['POST'])
 def delete_funcionario(id):
-    f = Funcionario.query.get_or_404(id)
-    db.session.delete(f)
+    # lógica de exclusão
+    funcionario = Funcionario.query.get_or_404(id)
+    db.session.delete(funcionario)
     db.session.commit()
-    flash('Funcionário excluído!')
+    flash('Funcionário excluído com sucesso!', 'success')
     return redirect(url_for('list_funcionarios'))
-
 
 @app.route('/funcionario/create', methods=['GET'])
 def create_funcionario_form():
@@ -649,11 +651,6 @@ def create_funcionario_form():
     return render_template('funcionario_create.html', empresas=empresas)
 
 
-@app.route('/funcionario/edit/<int:id>', methods=['GET'])
-def edit_funcionario_form(id):
-    f = Funcionario.query.get_or_404(id)
-    empresas = Empresa.query.all()
-    return render_template('funcionario_edit.html', f=f, empresas=empresas)
 
 
 # main.py
@@ -3714,50 +3711,66 @@ def novo_cliente():
 
     return render_template('cliente_form.html')
 
-@app.route('/avaliacao/nova/<int:cliente_id>', methods=['GET', 'POST'])
+
+import secrets
+from flask_mail import Mail, Message
+
+import secrets
+
+import secrets
+from urllib.parse import quote
+from flask import request, redirect
+
+
+import secrets
+from urllib.parse import quote
+from flask import request, url_for, render_template
+
+@app.route('/nova_avaliacao_psicossocial/<int:cliente_id>', methods=['GET', 'POST'])
 @login_required
-def nova_avaliacao(cliente_id):
-    cliente = db.session.get(Cliente, cliente_id)
-    if not cliente:
-        flash('Cliente não encontrado', 'danger')
-        return redirect(url_for('listar_clientes'))
-
-    funcionarios = Funcionario.query.all()
-
+def nova_avaliacao_psicossocial(cliente_id):
+    cliente = Cliente.query.get_or_404(cliente_id)
     if request.method == 'POST':
-        nome_funcionario = request.form.get('nome_funcionario')
-        cargo = request.form.get('cargo')
-        setor = request.form.get('setor')
-        email_funcionario = request.form.get('email_funcionario')
+        nome = request.form['nome_funcionario']
+        email = request.form.get('email_funcionario')
+        telefone = request.form['telefone']
+        cargo = request.form['cargo']
+        setor = request.form['setor']
 
-        import secrets
         token = secrets.token_urlsafe(32)
 
-        avaliacao = AvaliacaoPsicossocial(
+        nova_avaliacao = AvaliacaoPsicossocial(
             cliente_id=cliente.id,
-            token=token,
-            nome_funcionario=nome_funcionario,
+            nome_funcionario=nome,
+            email_funcionario=email,
             cargo=cargo,
             setor=setor,
-            email_funcionario=email_funcionario,
+            token=token,
             status='pendente'
         )
-        db.session.add(avaliacao)
+        db.session.add(nova_avaliacao)
         db.session.commit()
 
-        # Gera o link
-        link = url_for('responder_avaliacao', token=token, _external=True)
+        # Gera o link público da avaliação (usa o domínio da requisição)
+        link_avaliacao = url_for('responder_avaliacao', token=token, _external=True)
 
-        # Salva na sessão para exibir na tela
-        session['ultimo_link'] = link
-        session['ultimo_funcionario'] = nome_funcionario
+        # Prepara o número de telefone
+        telefone_limpo = ''.join(filter(str.isdigit, telefone))
+        if not telefone_limpo.startswith('55'):
+            telefone_limpo = '55' + telefone_limpo
 
-        flash(f'Avaliação criada para {nome_funcionario}!', 'success')
-        return redirect(url_for('mostrar_link_avaliacao', id=avaliacao.id))
+        # Mensagem
+        mensagem = f"Olá {nome}, você foi convidado para responder a avaliação psicossocial. Acesse o link: {link_avaliacao}"
+        mensagem_codificada = quote(mensagem, safe='')
+        link_whatsapp = f"https://wa.me/{telefone_limpo}?text={mensagem_codificada}"
 
-    return render_template('avaliacao_form.html', cliente=cliente, funcionarios=funcionarios)
+        # Página com os links (azul, para copiar)
+        return render_template('link_whatsapp_enviar.html',
+                               link_whatsapp=link_whatsapp,
+                               link_avaliacao=link_avaliacao,
+                               nome_funcionario=nome)
 
-
+    return render_template('nova_avaliacao_psicossocial.html', cliente=cliente)
 @app.route('/avaliacao/link/<int:id>')
 @login_required
 def mostrar_link_avaliacao(id):
@@ -3921,116 +3934,210 @@ def ver_resultado(id):
     return render_template('resultado_avaliacao.html', avaliacao=avaliacao)
 
 
-@app.route('/avaliacao/pdf/<int:id>')
-def gerar_pdf_resultado(id):
-    from reportlab.lib.pagesizes import A4
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.utils import simpleSplit
-    from io import BytesIO
-    from flask import make_response
-    import json
+from io import BytesIO
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import simpleSplit
+from flask import send_file
+import json
+from datetime import datetime
 
-    avaliacao = db.session.get(AvaliacaoPsicossocial, id)
-    if not avaliacao:
-        flash('Avaliação não encontrada', 'danger')
-        return redirect(url_for('index'))
 
-    respostas = json.loads(avaliacao.respostas) if avaliacao.respostas else {}
+@app.route('/avaliacao/pdf/<int:avaliacao_id>')
+@login_required
+def gerar_pdf_resultado(avaliacao_id):
+    avaliacao = AvaliacaoPsicossocial.query.get_or_404(avaliacao_id)
 
-    perguntas = {
-        'q1': '1. Como você avalia seu nível de estresse no trabalho?',
-        'q2': '2. Você sente que tem controle sobre suas atividades?',
-        'q3': '3. Como você avalia o apoio da sua liderança?',
-        'q4': '4. Você se sente sobrecarregado com a quantidade de trabalho?',
-        'q5': '5. Como você avalia o relacionamento com seus colegas?',
-        'q6': '6. Você tem autonomia para tomar decisões no seu trabalho?',
-        'q7': '7. Como você avalia o reconhecimento pelo seu trabalho?',
-        'q8': '8. Você consegue conciliar trabalho e vida pessoal?',
-        'q9': '9. Você tem sintomas físicos relacionados ao trabalho?',
-        'q10': '10. Como você avalia sua satisfação geral no trabalho?'
-    }
+    # Carregar respostas (JSON)
+    respostas = {}
+    if avaliacao.respostas:
+        try:
+            respostas = json.loads(avaliacao.respostas)
+        except:
+            respostas = {"Erro": "Não foi possível carregar as respostas"}
 
+    # Calcular pontuação (assumindo valores 1 a 5)
+    pontuacao_total = 0
+    for pergunta, resposta in respostas.items():
+        if isinstance(resposta, (int, float)):
+            pontuacao_total += resposta
+        elif isinstance(resposta, str) and resposta.isdigit():
+            pontuacao_total += int(resposta)
+
+    # Diagnóstico
+    if pontuacao_total <= 10:
+        diagnostico = "Baixo risco psicossocial. Ambiente saudável."
+    elif pontuacao_total <= 20:
+        diagnostico = "Risco moderado. Recomenda-se acompanhamento."
+    else:
+        diagnostico = "Alto risco psicossocial. Ações imediatas necessárias."
+
+    # Criar PDF
     buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
+    c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
+    y = height - 50
 
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, height - 50, "RELATÓRIO DE AVALIAÇÃO PSICOSSOCIAL")
+    # Título
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, y, "RELATÓRIO DE AVALIAÇÃO PSICOSSOCIAL")
+    y -= 40
 
-    p.setFont("Helvetica", 10)
-    p.drawString(50, height - 70, f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-    p.line(50, height - 75, width - 50, height - 75)
-
-    y = height - 100
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y, "DADOS DO FUNCIONÁRIO")
+    # Dados do funcionário
+    c.setFont("Helvetica", 12)
+    c.drawString(50, y, f"Funcionário: {avaliacao.nome_funcionario}")
     y -= 20
-    p.setFont("Helvetica", 10)
-    p.drawString(50, y, f"Nome: {avaliacao.nome_funcionario}")
-    y -= 15
-    p.drawString(50, y, f"Cargo: {avaliacao.cargo}")
-    y -= 15
-    p.drawString(50, y, f"Setor: {avaliacao.setor}")
-    y -= 25
-
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y, "RESPOSTAS DO QUESTIONÁRIO")
+    c.drawString(50, y,
+                 f"Data: {avaliacao.data_resposta.strftime('%d/%m/%Y %H:%M') if avaliacao.data_resposta else datetime.now().strftime('%d/%m/%Y %H:%M')}")
     y -= 20
-
-    p.setFont("Helvetica", 9)
-    for key, pergunta in perguntas.items():
-        valor = respostas.get(key, 'Não respondido')
-        p.drawString(50, y, f"{pergunta}: {valor}")
-        y -= 15
-        if y < 50:
-            p.showPage()
-            y = height - 50
-            p.setFont("Helvetica", 9)
-
-    y -= 25
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y, f"PONTUAÇÃO TOTAL: {avaliacao.pontuacao_total} pontos")
-    y -= 20
-    p.drawString(50, y, f"NÍVEL DE RISCO: {avaliacao.nivel_risco}")
-
+    c.drawString(50, y, f"Cargo: {avaliacao.cargo} | Setor: {avaliacao.setor}")
     y -= 30
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y, "RECOMENDAÇÕES:")
+
+    # Pontuação e diagnóstico
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, y, f"Pontuação total: {pontuacao_total} pontos")
     y -= 20
-    p.setFont("Helvetica", 10)
+    c.drawString(50, y, f"Diagnóstico: {diagnostico}")
+    y -= 40
 
-    recomendacoes = {
-        'Baixo': ['- Manter as boas práticas atuais', '- Realizar acompanhamento anual'],
-        'Médio': ['- Implementar programa de qualidade de vida', '- Oferecer pausas ativas',
-                  '- Realizar acompanhamento semestral'],
-        'Alto': ['- Intervenção no ambiente de trabalho', '- Oferecer apoio psicológico',
-                 '- Acompanhamento trimestral'],
-        'Crítico': ['- INTERVENÇÃO URGENTE NECESSÁRIA!', '- Afastamento temporário se necessário',
-                    '- Acompanhamento psicológico semanal', '- Reavaliação em 30 dias']
-    }
+    # Detalhamento das respostas
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, y, "Respostas detalhadas:")
+    y -= 20
+    c.setFont("Helvetica", 10)
 
-    for rec in recomendacoes[avaliacao.nivel_risco]:
-        p.drawString(50, y, rec)
-        y -= 15
+    for pergunta, resposta in respostas.items():
+        texto = f"• {pergunta}: {resposta}"
+        linhas = simpleSplit(texto, c._fontname, c._fontsize, width - 100)
+        for linha in linhas:
+            if y < 50:
+                c.showPage()
+                y = height - 50
+                c.setFont("Helvetica", 10)
+            c.drawString(50, y, linha)
+            y -= 15
+        y -= 5
 
-    p.save()
+    # Rodapé na última página
+    c.showPage()
+    c.save()
     buffer.seek(0)
 
-    return make_response(buffer.getvalue(), 200, {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': f'inline; filename=avaliacao_{avaliacao.id}.pdf'
-    })
-
-
+    return send_file(
+        buffer,
+        as_attachment=False,
+        mimetype='application/pdf',
+        download_name=f'resultado_avaliacao_{avaliacao_id}.pdf'
+    )
 @app.route('/avaliacoes')
 @login_required
 def listar_avaliacoes():
-    avaliacoes = AvaliacaoPsicossocial.query.order_by(AvaliacaoPsicossocial.created_at.desc()).all()
+    # Ordenar por data_envio decrescente (mais recente primeiro)
+    avaliacoes = AvaliacaoPsicossocial.query.order_by(AvaliacaoPsicossocial.data_envio.desc()).all()
     return render_template('avaliacoes_list.html', avaliacoes=avaliacoes)
 
 @app.route('/avaliacao/short/<token>')
 def avaliacao_short(token):
     return redirect(url_for('responder_avaliacao', token=token))
+from flask import send_file
+
+def gerar_pdf_resultado(avaliacao_id):
+    avaliacao = AvaliacaoPsicossocial.query.get_or_404(avaliacao_id)
+    # Recupera as respostas (assumindo que estão em JSON)
+    import json
+    respostas = json.loads(avaliacao.respostas) if avaliacao.respostas else {}
+    pontuacao_total = sum(int(v) for v in respostas.values() if v.isdigit())
+    # Agora use pontuacao_total no PDF
+    p.drawString(50, y, f"PONTUAÇÃO TOTAL: {pontuacao_total} pontos")
+
+import requests
+
+def encurtar_url(url):
+    try:
+        response = requests.get(f"https://tinyurl.com/api-create.php?url={url}")
+        if response.status_code == 200:
+            return response.text
+    except:
+        pass
+    return url
+########################################################   ROTAS DE EPI ####################################
+# Importações necessárias (certifique-se de que todas estão no topo do arquivo)
+from flask import render_template, make_response, redirect, url_for, flash, request
+from flask_login import login_required
+from datetime import datetime
+from models import EPIEntrega, Funcionario  # ajuste o caminho conforme seu projeto
+
+# ================== ROTAS CORRIGIDAS ==================
+
+@app.route('/listar_epi')
+@login_required
+def listar_epi():
+    try:
+        entregas = EPIEntrega.query.all()
+        # Adiciona o nome do funcionário ao objeto (para exibição no template)
+        for entrega in entregas:
+            entrega.funcionario_nome = entrega.funcionario.nome if entrega.funcionario else 'Desconhecido'
+    except Exception as e:
+        entregas = []
+        flash('Erro ao carregar EPIs. Verifique se a tabela existe.', 'warning')
+    return render_template('listar_epi.html', entregas=entregas)
+
+
+@app.route('/criar_entrega_epi', methods=['GET', 'POST'])
+@login_required
+def criar_entrega_epi():
+    if request.method == 'POST':
+        funcionario_id = request.form.get('funcionario_id')
+        epi_nome = request.form.get('epi_nome')
+        quantidade = int(request.form.get('quantidade', 1))
+        data_entrega = datetime.strptime(request.form.get('data_entrega'), '%Y-%m-%d').date()
+        data_validade = request.form.get('data_validade')
+        if data_validade:
+            data_validade = datetime.strptime(data_validade, '%Y-%m-%d').date()
+        else:
+            data_validade = None
+        observacoes = request.form.get('observacoes')
+
+        nova_entrega = EPIEntrega(
+            funcionario_id=funcionario_id,
+            epi_nome=epi_nome,
+            quantidade=quantidade,
+            data_entrega=data_entrega,
+            data_validade=data_validade,
+            observacoes=observacoes
+        )
+        db.session.add(nova_entrega)
+        db.session.commit()
+        flash('Entrega de EPI registrada com sucesso!', 'success')
+        return redirect(url_for('listar_epi'))
+
+    funcionarios = Funcionario.query.all()
+    return render_template('criar_entrega_epi.html', funcionarios=funcionarios)
+
+
+# ROTA DA FICHA (SEM WEYASPRINT – usa HTML + impressão do navegador)
+@app.route('/ficha_epi/<int:entrega_id>')
+@login_required
+def ficha_epi(entrega_id):
+    entrega = EPIEntrega.query.get_or_404(entrega_id)
+    funcionario = entrega.funcionario
+    # Tenta obter a empresa associada ao funcionário (se existir)
+    empresa = None
+    if funcionario and hasattr(funcionario, 'empresa'):
+        empresa = funcionario.empresa
+    elif funcionario and hasattr(funcionario, 'empresa_id'):
+        # Se houver relacionamento, busque a empresa
+        from models import Empresa
+        empresa = Empresa.query.get(funcionario.empresa_id) if funcionario.empresa_id else None
+
+    return render_template('ficha_epi_pdf.html',
+                           entrega=entrega,
+                           funcionario=funcionario,
+                           empresa=empresa,
+                           data_atual=datetime.now().strftime('%d/%m/%Y %H:%M'))
+with app.app_context():
+    db.create_all()
+    print("✅ Tabelas verificadas/criadas com sucesso!")
 # ================= EXECUÇÃO =================
-if __name__ == '__main__':
-    app.run()
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)

@@ -44,7 +44,7 @@
             </div>
 
             <div class="text-center mt-4">
-                <a href="{{ url_for('gerar_pdf_resultado', id=avaliacao.id) }}" class="btn btn-danger" target="_blank">
+                <a href="{{ url_for('gerar_pdf_resultado', avaliacao_id=avaliacao.id) }}" class="btn btn-danger" target="_blank">
                     <i class="bi bi-file-pdf"></i> Baixar PDF
                 </a>
                 <a href="{{ url_for('listar_avaliacoes') }}" class="btn btn-secondary">

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card shadow">
+        <div class="card-header bg-success text-white">
+            <h4><i class="bi bi-whatsapp"></i> Link para Enviar ao Funcionário</h4>
+        </div>
+        <div class="card-body text-center">
+            <p>A avaliação para <strong>{{ nome_funcionario }}</strong> foi criada com sucesso!</p>
+
+            <p>Clique no botão abaixo para copiar o link do WhatsApp:</p>
+            <div class="input-group mb-3">
+                <input type="text" id="whatsappLink" class="form-control" value="{{ link_whatsapp }}" readonly>
+                <button class="btn btn-success" onclick="copyToClipboard('whatsappLink')">
+                    <i class="bi bi-copy"></i> Copiar Link
+                </button>
+            </div>
+
+            <!-- Botão verde para abrir o WhatsApp diretamente -->
+            <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success btn-lg mb-3">
+                <i class="bi bi-whatsapp"></i> Abrir no WhatsApp
+            </a>
+
+            <hr>
+
+            <p>Ou copie o link direto da avaliação (caso queira enviar manualmente):</p>
+            <div class="input-group mb-3">
+                <input type="text" id="avaliacaoLink" class="form-control" value="{{ link_avaliacao }}" readonly>
+                <button class="btn btn-secondary" onclick="copyToClipboard('avaliacaoLink')">Copiar</button>
+            </div>
+
+            <a href="{{ url_for('listar_avaliacoes') }}" class="btn btn-primary mt-2">Ver avaliações</a>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard(elementId) {
+    var copyText = document.getElementById(elementId);
+    copyText.select();
+    document.execCommand("copy");
+    alert("Link copiado: " + copyText.value);
+}
+</script>
+{% endblock %}

@@ -8,7 +8,7 @@
         </div>
         <div class="card-body">
             <a href="{{ url_for('create_funcionario') }}" class="btn btn-success mb-3">
-                Novo Funcionário
+                <i class="fas fa-plus"></i> Novo Funcionário
             </a>
 
             <div class="table-responsive">
@@ -35,14 +35,25 @@
                             <td>{{ func.cbo }}</td>
                             <td>{{ func.funcao }}</td>
                             <td>{{ func.empresa.nome if func.empresa else 'N/A' }}</td>
-                            <td>
-                                <button class="btn btn-sm btn-info" onclick="alert('Editar em breve')">Editar</button>
-                                <button class="btn btn-sm btn-danger" onclick="alert('Excluir em breve')">Excluir</button>
+                            <td class="actions">
+                                <a href="{{ url_for('edit_funcionario', id=func.id) }}" class="btn btn-sm btn-info">
+                                    <i class="fas fa-edit"></i> Editar
+                                </a>
+                                <form action="{{ url_for('delete_funcionario', id=func.id) }}" method="POST" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir o funcionário {{ func.nome }}?')">
+                                        <i class="fas fa-trash"></i> Excluir
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="8" class="text-center">Nenhum funcionário cadastrado</td>
+                            <td colspan="8" class="text-center">
+                                <div class="alert alert-info mb-0">
+                                    Nenhum funcionário cadastrado.
+                                    <a href="{{ url_for('create_funcionario') }}">Clique aqui</a> para adicionar.
+                                </div>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -51,4 +62,14 @@
         </div>
     </div>
 </div>
+
+<style>
+    .actions {
+        white-space: nowrap;
+        min-width: 150px;
+    }
+    .actions .btn {
+        margin: 0 2px;
+    }
+</style>
 {% endblock %}

@@ -1,0 +1,54 @@
+﻿{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h4 class="mb-0">Editar Funcionário</h4>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                <div class="mb-3">
+                    <label for="nome" class="form-label">Nome *</label>
+                    <input type="text" class="form-control" id="nome" name="nome" value="{{ funcionario.nome }}" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="cpf" class="form-label">CPF *</label>
+                    <input type="text" class="form-control" id="cpf" name="cpf" value="{{ funcionario.cpf }}" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="matricula_esocial" class="form-label">Matrícula eSocial</label>
+                    <input type="text" class="form-control" id="matricula_esocial" name="matricula_esocial" value="{{ funcionario.matricula_esocial or '' }}">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="cbo" class="form-label">CBO *</label>
+                    <input type="text" class="form-control" id="cbo" name="cbo" value="{{ funcionario.cbo }}" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="funcao" class="form-label">Função *</label>
+                    <input type="text" class="form-control" id="funcao" name="funcao" value="{{ funcionario.funcao }}" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="empresa_id" class="form-label">Empresa *</label>
+                    <select class="form-control" id="empresa_id" name="empresa_id" required>
+                        <option value="">Selecione uma empresa</option>
+                        {% for empresa in empresas %}
+                        <option value="{{ empresa.id }}" {% if empresa.id == funcionario.empresa_id %}selected{% endif %}>
+                            {{ empresa.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-info">Atualizar</button>
+                <a href="{{ url_for('list_funcionarios') }}" class="btn btn-secondary">Cancelar</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

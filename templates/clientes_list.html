@@ -34,8 +34,7 @@
                             <td>{{ cliente.telefone or '-' }}</td>
                             <td>{{ cliente.data_cadastro.strftime('%d/%m/%Y') if cliente.data_cadastro else '-' }}</td>
                             <td>
-                                <a href="{{ url_for('nova_avaliacao', cliente_id=cliente.id) }}" class="btn btn-sm btn-success">
-                                    <i class="bi bi-send"></i> Nova Avalia??o
+                                <a href="{{ url_for('nova_avaliacao_psicossocial', cliente_id=cliente.id) }}" class="btn btn-sm btn-success">
                                 </a>
                             </td>
                         </tr>

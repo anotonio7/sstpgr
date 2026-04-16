@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3>Entrega de EPI - {{ funcionario.nome }}</h3>
+
+<form method="POST">
+    <div class="mb-3">
+        <label>EPI</label>
+        <select name="epi_id" class="form-control">
+            {% for epi in epis %}
+            <option value="{{ epi.id }}">{{ epi.nome }} (CA: {{ epi.ca }})</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <button class="btn btn-success">Entregar EPI</button>
+</form>
+
+<hr>
+
+<h4>Histórico</h4>
+<table class="table">
+    <tr>
+        <th>EPI</th>
+        <th>CA</th>
+        <th>Data</th>
+    </tr>
+
+    {% for e in entregas %}
+    <tr>
+        <td>{{ e.epi.nome }}</td>
+        <td>{{ e.epi.ca }}</td>
+        <td>{{ e.data_entrega.strftime("%d/%m/%Y") }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<a href="/gerar_ficha_epi/{{ funcionario.id }}" class="btn btn-primary">
+    📄 Gerar Ficha EPI
+</a>
+
+{% endblock %}

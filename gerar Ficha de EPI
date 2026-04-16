@@ -1,0 +1,53 @@
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from datetime import datetime
+import os
+
+def gerar_ficha_epi(funcionario, epis):
+    caminho = f"static/fichas_epi/ficha_{funcionario['nome']}.pdf"
+    os.makedirs(os.path.dirname(caminho), exist_ok=True)
+
+    doc = SimpleDocTemplate(caminho)
+    styles = getSampleStyleSheet()
+
+    elementos = []
+
+    # Título
+    elementos.append(Paragraph("FICHA DE ENTREGA DE EPI", styles['Title']))
+    elementos.append(Spacer(1, 12))
+
+    # Dados do funcionário
+    elementos.append(Paragraph(f"Nome: {funcionario['nome']}", styles['Normal']))
+    elementos.append(Paragraph(f"CPF: {funcionario['cpf']}", styles['Normal']))
+    elementos.append(Paragraph(f"Função: {funcionario['funcao']}", styles['Normal']))
+    elementos.append(Spacer(1, 12))
+
+    # Tabela de EPIs
+    dados = [["EPI", "CA", "Data Entrega", "Assinatura"]]
+
+    for epi in epis:
+        dados.append([
+            epi['nome'],
+            epi['ca'],
+            datetime.now().strftime("%d/%m/%Y"),
+            "__________________"
+        ])
+
+    tabela = Table(dados)
+    tabela.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.grey),
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
+    ]))
+
+    elementos.append(tabela)
+    elementos.append(Spacer(1, 20))
+
+    # Assinaturas
+    elementos.append(Paragraph("Assinatura do Funcionário: ____________________", styles['Normal']))
+    elementos.append(Spacer(1, 12))
+    elementos.append(Paragraph("Responsável pela Entrega: ____________________", styles['Normal']))
+
+    doc.build(elementos)
+
+    return caminho
