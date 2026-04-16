@@ -3,19 +3,19 @@
 <div class="row justify-content-center">
     <div class="col-md-4">
         <div class="card mt-5">
-            <div class="card-header bg-warning">
+            <div class="card-header bg-info text-white">
                 <h4 class="text-center mb-0">Recuperar Senha</h4>
             </div>
             <div class="card-body">
-                <p class="text-muted">Digite seu email para receber o link de recuperação</p>
+                <p>Digite seu nome de usuário. Uma nova senha temporária será gerada e exibida na próxima tela.</p>
                 <form method="POST">
                     <div class="mb-3">
-                        <label>Email</label>
-                        <input type="email" name="email" class="form-control" required>
+                        <label>Nome de Usuário</label>
+                        <input type="text" name="username" class="form-control" required autofocus>
                     </div>
-                    <button type="submit" class="btn btn-warning w-100">Enviar Link</button>
+                    <button type="submit" class="btn btn-info w-100 text-white">Gerar nova senha</button>
                 </form>
-                <div class="mt-3 text-center">
+                <div class="text-center mt-3">
                     <a href="{{ url_for('login') }}">Voltar para o login</a>
                 </div>
             </div>

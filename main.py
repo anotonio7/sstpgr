@@ -2061,13 +2061,66 @@ def processar_s2210():
 
 
 # ================= ROTAS S-2240 =================
-TABELA_24_AGENTES = [
-    {"codigo": "01.01.001", "descricao": "Sílica livre cristalizada"},
-    {"codigo": "01.01.002", "descricao": "Asbesto (amianto)"},
-    {"codigo": "01.02.001", "descricao": "Benzeno"},
-    {"codigo": "01.02.002", "descricao": "Chumbo metálico"},
-    {"codigo": "02.01.001", "descricao": "Ruído contínuo ou intermitente"},
-    {"codigo": "02.02.001", "descricao": "Calor (sobrecarga térmica)"},
+TABELA_24_AGENTES = RISCOS_OCUPACIONAIS = [
+    # Código especial para NENHUM RISCO
+    {"codigo": "00.00.000", "descricao": "Nenhum risco identificado"},
+
+    # Físicos
+    {"codigo": "01.01.001", "descricao": "Ruído contínuo ou intermitente"},
+    {"codigo": "01.01.002", "descricao": "Ruído de impacto"},
+    {"codigo": "01.02.001", "descricao": "Vibração localizada"},
+    {"codigo": "01.02.002", "descricao": "Vibração de corpo inteiro"},
+    {"codigo": "01.03.001", "descricao": "Calor (sobrecarga térmica)"},
+    {"codigo": "01.03.002", "descricao": "Frio"},
+    {"codigo": "01.04.001", "descricao": "Radiação ionizante"},
+    {"codigo": "01.04.002", "descricao": "Radiação não ionizante (luz, laser, UV, infravermelho, micro-ondas, radiofrequência)"},
+    {"codigo": "01.05.001", "descricao": "Pressões anormais (hiperbárica, hipobárica)"},
+    {"codigo": "01.06.001", "descricao": "Umidade"},
+
+    # Químicos
+    {"codigo": "02.01.001", "descricao": "Sílica livre cristalizada"},
+    {"codigo": "02.01.002", "descricao": "Asbesto (amianto)"},
+    {"codigo": "02.02.001", "descricao": "Benzeno"},
+    {"codigo": "02.02.002", "descricao": "Chumbo metálico"},
+    {"codigo": "02.02.003", "descricao": "Mercúrio"},
+    {"codigo": "02.02.004", "descricao": "Cádmio"},
+    {"codigo": "02.02.005", "descricao": "Cromo hexavalente"},
+    {"codigo": "02.03.001", "descricao": "Hidrocarbonetos aromáticos (tolueno, xileno, etc.)"},
+    {"codigo": "02.03.002", "descricao": "Solventes clorados (tricloroetileno, percloroetileno)"},
+    {"codigo": "02.04.001", "descricao": "Poeiras minerais (carvão, caulim, talco, etc.)"},
+    {"codigo": "02.04.002", "descricao": "Poeiras vegetais (algodão, madeira, grãos, etc.)"},
+    {"codigo": "02.05.001", "descricao": "Fumos metálicos (soldagem, corte)"},
+    {"codigo": "02.06.001", "descricao": "Gases e vapores (CO2, SO2, NH3, Cl2, etc.)"},
+
+    # Biológicos
+    {"codigo": "03.01.001", "descricao": "Bactérias (Bacillus anthracis, Leptospira, etc.)"},
+    {"codigo": "03.02.001", "descricao": "Vírus (Hepatite B, HIV, Hantavírus, etc.)"},
+    {"codigo": "03.03.001", "descricao": "Parasitas (malária, toxoplasmose, etc.)"},
+    {"codigo": "03.04.001", "descricao": "Fungos (microtoxinas, histoplasmose, etc.)"},
+
+    # Ergonômicos
+    {"codigo": "04.01.001", "descricao": "Levantamento e transporte manual de peso"},
+    {"codigo": "04.02.001", "descricao": "Movimentos repetitivos"},
+    {"codigo": "04.03.001", "descricao": "Posturas inadequadas"},
+    {"codigo": "04.04.001", "descricao": "Jornada de trabalho prolongada / excessiva"},
+    {"codigo": "04.05.001", "descricao": "Trabalho noturno"},
+    {"codigo": "04.06.001", "descricao": "Monitoramento de tela (computador) sem pausas"},
+
+    # Mecânicos / Acidentes
+    {"codigo": "05.01.001", "descricao": "Máquinas e equipamentos sem proteção"},
+    {"codigo": "05.02.001", "descricao": "Risco de quedas em altura"},
+    {"codigo": "05.02.002", "descricao": "Risco de quedas no mesmo nível"},
+    {"codigo": "05.03.001", "descricao": "Eletricidade (contato direto/indireto)"},
+    {"codigo": "05.04.001", "descricao": "Incêndio / explosão"},
+    {"codigo": "05.05.001", "descricao": "Arranjo físico inadequado (espaço reduzido, obstáculos)"},
+    {"codigo": "05.06.001", "descricao": "Iluminação insuficiente ou excessiva"},
+
+    # Organizacionais / Psicossociais
+    {"codigo": "06.01.001", "descricao": "Trabalho sob pressão (assédio moral, metas abusivas)"},
+    {"codigo": "06.02.001", "descricao": "Conflitos interpessoais"},
+    {"codigo": "06.03.001", "descricao": "Isolamento profissional / trabalho solitário"},
+    {"codigo": "06.04.001", "descricao": "Falta de autonomia / controle sobre tarefas"},
+    {"codigo": "06.05.001", "descricao": "Dupla jornada de trabalho (externo + doméstico)"}
 ]
 
 
@@ -3712,14 +3765,6 @@ def novo_cliente():
     return render_template('cliente_form.html')
 
 
-import secrets
-from flask_mail import Mail, Message
-
-import secrets
-
-import secrets
-from urllib.parse import quote
-from flask import request, redirect
 
 
 import secrets
@@ -4146,6 +4191,35 @@ def ficha_epi(entrega_id):
 with app.app_context():
     db.create_all()
     print("✅ Tabelas verificadas/criadas com sucesso!")
+
+################################################################# RECUPERAÇÃO DE SENHA ########################
+import random
+import string
+
+
+@app.route('/esqueci_senha', methods=['GET', 'POST'])
+def esqueci_senha():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        if not username:
+            flash('Digite o nome de usuário', 'danger')
+            return redirect(url_for('esqueci_senha'))
+
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            # Por segurança, não informa se usuário existe (mas para simplificar, pode avisar)
+            flash('Usuário não encontrado', 'danger')
+            return redirect(url_for('esqueci_senha'))
+
+        # Gerar senha temporária (6 caracteres alfanuméricos)
+        temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
+        user.set_password(temp_password)  # método que faz hash
+        db.session.commit()
+
+        # Exibe a senha na tela (sem e-mail)
+        return render_template('senha_temporaria.html', senha=temp_password, username=user.username)
+
+    return render_template('esqueci_senha.html')
 # ================= EXECUÇÃO =================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

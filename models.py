@@ -107,6 +107,7 @@ class S2220Exame(db.Model):
     resultado = db.Column(db.Text, nullable=False)
 
 
+
 # ================= EVENTO S-2221 (EXAME TOXICOLÓGICO) =================
 class EventoS2221(db.Model):
     __tablename__ = 'evento_s2221'

@@ -44,8 +44,20 @@
                title="Digite um CPF válido (ex: 123.456.789-00)">
     </div>
 
-    <!-- Bloco de Riscos Ambientais (Tabela 24) -->
+    <!-- Opção: Nenhum risco identificado -->
     <div class="card mb-3">
+        <div class="card-header bg-light">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="nenhumRiscoCheckbox">
+                <label class="form-check-label fw-bold" for="nenhumRiscoCheckbox">
+                    Nenhum risco identificado (marcar esta opção dispensa a seleção de agentes nocivos)
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bloco de Riscos Ambientais (Tabela 24) -->
+    <div class="card mb-3" id="blocoRiscos">
         <div class="card-header">
             <strong>Riscos Ambientais (Tabela 24 – Agentes Nocivos)</strong>
             <button type="button" class="btn btn-sm btn-success float-end" id="btnAdicionarRisco">
@@ -75,8 +87,14 @@
 </form>
 
 <script>
-// Tabela 24 fornecida pelo backend
+// Tabela 24 fornecida pelo backend (já deve incluir o código 00.00.000)
 const tabela24 = {{ tabela24 | tojson }};
+
+// Garante que o código "00.00.000 - Nenhum risco identificado" exista (caso o backend não envie)
+const riscoNenhum = { "codigo": "00.00.000", "descricao": "Nenhum risco identificado" };
+if (!tabela24.some(item => item.codigo === "00.00.000")) {
+    tabela24.unshift(riscoNenhum);
+}
 
 // Preencher campos do funcionário ao selecionar
 function preencherDadosFuncionario() {
@@ -90,7 +108,6 @@ function preencherDadosFuncionario() {
         document.getElementById('matricula_trab').value = matricula;
         document.getElementById('cbo_trab').value = cbo;
 
-        // Validação visual: se matrícula ou CBO estiverem vazios, exibe aviso
         if (!matricula || !cbo) {
             const aviso = document.getElementById('avisoDadosFaltantes');
             if (aviso) aviso.style.display = 'block';
@@ -106,7 +123,6 @@ function preencherDadosFuncionario() {
 }
 
 document.getElementById('funcionario_id').addEventListener('change', preencherDadosFuncionario);
-// Executar na carga inicial
 preencherDadosFuncionario();
 
 function criarLinhaRisco(agenteCod = '', intensidade = '', epi = '') {
@@ -130,14 +146,61 @@ function criarLinhaRisco(agenteCod = '', intensidade = '', epi = '') {
 }
 
 const container = document.getElementById('riscosContainer');
-document.getElementById('btnAdicionarRisco').addEventListener('click', () => {
-    container.appendChild(criarLinhaRisco());
-});
-// Adiciona uma linha inicial
+const btnAdicionar = document.getElementById('btnAdicionarRisco');
+const checkboxNenhum = document.getElementById('nenhumRiscoCheckbox');
+const blocoRiscos = document.getElementById('blocoRiscos');
+
+// Função para habilitar/desabilitar o bloco de riscos baseado no checkbox
+function toggleRiscos() {
+    if (checkboxNenhum.checked) {
+        // Limpar todas as linhas de risco e desabilitar botão de adicionar
+        container.innerHTML = '';
+        btnAdicionar.disabled = true;
+        // Opcional: desabilitar selects e inputs dentro do bloco
+        const selects = document.querySelectorAll('#tabelaRiscos select, #tabelaRiscos input');
+        selects.forEach(el => el.disabled = true);
+        // Esconde o bloco ou apenas deixa desabilitado
+        blocoRiscos.style.opacity = '0.6';
+    } else {
+        // Restaurar: se não houver nenhuma linha, adicionar uma linha padrão
+        if (container.children.length === 0) {
+            container.appendChild(criarLinhaRisco());
+        }
+        btnAdicionar.disabled = false;
+        const selects = document.querySelectorAll('#tabelaRiscos select, #tabelaRiscos input');
+        selects.forEach(el => el.disabled = false);
+        blocoRiscos.style.opacity = '1';
+    }
+}
+
+checkboxNenhum.addEventListener('change', toggleRiscos);
+
+// Inicializa com uma linha padrão
 container.appendChild(criarLinhaRisco());
+btnAdicionar.addEventListener('click', () => {
+    if (!checkboxNenhum.checked) {
+        container.appendChild(criarLinhaRisco());
+    }
+});
+
+// Interceptar envio do formulário para adicionar campo oculto caso "nenhum risco" esteja marcado
+const form = document.getElementById('formS2240');
+form.addEventListener('submit', function(e) {
+    if (checkboxNenhum.checked) {
+        // Impede o envio dos arrays de riscos (já que não há nenhum)
+        // Cria um campo oculto para informar ao backend que não há riscos
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'nenhum_risco';
+        hiddenInput.value = 'true';
+        form.appendChild(hiddenInput);
+        // Remove a exigência (required) dos selects de risco para não travar o envio
+        const selects = document.querySelectorAll('select[name="agente_codigo[]"]');
+        selects.forEach(sel => sel.required = false);
+    }
+});
 
 async function enviarForm(apenasGerarXml = false) {
-    // Validação extra antes de enviar: verifica se funcionário tem matrícula e CBO
     const matricula = document.getElementById('matricula_trab').value;
     const cbo = document.getElementById('cbo_trab').value;
     if (!matricula || !cbo) {
@@ -182,7 +245,6 @@ document.getElementById('btnGerarXML').addEventListener('click', () => {
 });
 </script>
 
-<!-- Aviso para dados faltantes -->
 <div id="avisoDadosFaltantes" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 9999;" class="alert alert-warning alert-dismissible fade show" role="alert">
     <strong>Atenção!</strong> O funcionário selecionado não possui Matrícula eSocial ou CBO. É necessário preencher esses dados no cadastro do funcionário para gerar o evento S-2240.
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
