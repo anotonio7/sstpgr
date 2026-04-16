@@ -2,8 +2,8 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2><i class="bi bi-clipboard-check"></i> Avalia??es Psicossociais</h2>
-    
+    <h2><i class="bi bi-clipboard-check"></i> Avaliações Psicossociais</h2>
+
     <div class="card mt-3">
         <div class="card-body">
             <div class="table-responsive">
@@ -11,14 +11,14 @@
                     <thead class="table-dark">
                         <tr>
                             <th>ID</th>
-                            <th>Funcion?rio</th>
+                            <th>Funcionário</th>
                             <th>Email</th>
                             <th>Cargo</th>
                             <th>Setor</th>
                             <th>Status</th>
-                            <th>Pontua??o</th>
-                            <th>N?vel</th>
-                            <th>A??es</th>
+                            <th>Pontuação</th>
+                            <th>Nível</th>
+                            <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -26,7 +26,7 @@
                         <tr>
                             <td>{{ a.id }}</td>
                             <td>{{ a.nome_funcionario }}</td>
-                            <td>{{ a.email_funcionario }}</td>
+                            <td>{{ a.email_funcionario or '-' }}</td>
                             <td>{{ a.cargo }}</td>
                             <td>{{ a.setor }}</td>
                             <td>
@@ -40,11 +40,11 @@
                             <td>
                                 {% if a.nivel_risco == 'Baixo' %}
                                     <span class="badge bg-success">{{ a.nivel_risco }}</span>
-                                {% elif a.nivel_risco == 'M?dio' %}
+                                {% elif a.nivel_risco == 'Médio' %}
                                     <span class="badge bg-warning">{{ a.nivel_risco }}</span>
                                 {% elif a.nivel_risco == 'Alto' %}
                                     <span class="badge bg-danger">{{ a.nivel_risco }}</span>
-                                {% elif a.nivel_risco == 'Cr?tico' %}
+                                {% elif a.nivel_risco == 'Crítico' %}
                                     <span class="badge bg-dark">{{ a.nivel_risco }}</span>
                                 {% else %}
                                     -
@@ -56,19 +56,26 @@
                                         <i class="bi bi-envelope"></i> Reenviar
                                     </a>
                                 {% else %}
-                                    <a href="{{ url_for('ver_resultado', id=a.id) }}" class="btn btn-sm btn-info">
+                                    <a href="{{ url_for('ver_resultado', avaliacao_id=a.id) }}" class="btn btn-sm btn-info">
                                         <i class="bi bi-eye"></i> Ver
                                     </a>
                                     <a href="{{ url_for('gerar_pdf_resultado', avaliacao_id=a.id) }}" class="btn btn-sm btn-danger" target="_blank">
                                         <i class="bi bi-file-pdf"></i> PDF
                                     </a>
                                 {% endif %}
+
+                                <!-- Botão de excluir (sempre visível, com confirmação) -->
+                                <form method="POST" action="{{ url_for('excluir_avaliacao', avaliacao_id=a.id) }}" style="display: inline-block;" onsubmit="return confirm('Tem certeza que deseja excluir esta avaliação? Essa ação não pode ser desfeita.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i> Excluir
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                         {% else %}
                         <tr>
                             <td colspan="9" class="text-center text-muted">
-                                Nenhuma avalia??o encontrada.
+                                Nenhuma avaliação encontrada.
                             </td>
                         </tr>
                         {% endfor %}

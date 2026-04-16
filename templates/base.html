@@ -6,6 +6,32 @@
     <title>Sistema SST - Gerenciamento de Riscos Ocupacionais</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        .pix-card {
+            background: linear-gradient(135deg, #32CD32 0%, #228B22 100%);
+            border-radius: 15px;
+            padding: 15px;
+            color: white;
+            margin-top: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .pix-key {
+            background: rgba(255,255,255,0.2);
+            padding: 8px;
+            border-radius: 8px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .copy-btn {
+            background-color: #fff;
+            color: #228B22;
+            border: none;
+            font-weight: bold;
+        }
+        .copy-btn:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
 </head>
 <body>
     <!-- Indicador de modo (TESTE ou PRODUÇÃO) -->
@@ -74,7 +100,6 @@
 
                     <hr>
 
-                    <!-- Botão para Gestão de EPIs (rota esperada: listar_epi) -->
                     <a href="{{ url_for('listar_epi') }}" class="list-group-item list-group-item-action bg-success text-white">
                         <i class="bi bi-shield-check"></i> 🛡️ Gestão de EPIs
                     </a>
@@ -155,6 +180,30 @@
 
         {% block content %}{% endblock %}
 
+        <!-- ========= NOVO: CARD PIX PARA CLIENTE (VISÍVEL NA ÁREA DE CONTEÚDO) ========= -->
+        <div class="pix-card mt-4 mb-4">
+            <div class="row align-items-center">
+                <div class="col-md-2 text-center">
+                    <i class="bi bi-qr-code" style="font-size: 48px;"></i>
+                </div>
+                <div class="col-md-6">
+                    <h5><i class="bi bi-currency-dollar"></i> Contribuição voluntária</h5>
+                    <p class="mb-1">Ajude a manter o sistema! Sua doação é muito importante.</p>
+                    <p><strong>Valor sugerido:</strong> R$ 50,00</p>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <input type="text" id="pixKey" class="form-control pix-key" value="sstergonomia2@gmail.com" readonly>
+                        <button class="btn btn-light copy-btn" onclick="copyPix()">
+                            <i class="bi bi-copy"></i> Copiar chave
+                        </button>
+                    </div>
+                    <small class="text-light">Chave PIX (e-mail)</small>
+                </div>
+            </div>
+        </div>
+        <!-- ========= FIM DO CARD PIX ========= -->
+
         {% if current_user.is_authenticated %}
             </div>
         </div>
@@ -164,9 +213,9 @@
         {% endif %}
     </div>
 
-    <!-- Modal Tira Dúvidas -->
+    <!-- Modal Tira Dúvidas (já existente, mas melhoramos a seção PIX) -->
     <div class="modal fade" id="modalDuvidas" tabindex="-1" aria-labelledby="modalDuvidasLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header bg-info text-white">
                     <h5 class="modal-title" id="modalDuvidasLabel">
@@ -183,7 +232,14 @@
                             <p><strong>📞 Telefone:</strong> (73) 99977-3814</p>
                             <p><strong>📧 E-mail:</strong> sstergonomia2@gmail.com</p>
                             <p><strong>💬 WhatsApp:</strong> (73) 99977-3814</p>
-                            <p><strong>💰 Pix:</strong> Antonio Marcos - Contribuição de R$ 50,00</p>
+                        </div>
+
+                        <!-- Seção PIX destacada no modal -->
+                        <div class="pix-card mt-3 mb-3" style="background: #28a745;">
+                            <h5><i class="bi bi-cash-stack"></i> Apoie o projeto</h5>
+                            <p><strong>PIX (Chave aleatória ou e-mail):</strong> <span id="pixModalKey" class="fw-bold">sstergonomia2@gmail.com</span></p>
+                            <button class="btn btn-sm btn-light" onclick="copyModalPix()">Copiar chave PIX</button>
+                            <p class="mt-2 mb-0">Contribuição sugerida: <strong>R$ 50,00</strong> - Qualquer valor ajuda!</p>
                         </div>
 
                         <hr>
@@ -207,5 +263,21 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function copyPix() {
+            var copyText = document.getElementById("pixKey");
+            copyText.select();
+            document.execCommand("copy");
+            alert("Chave PIX copiada: " + copyText.value);
+        }
+        function copyModalPix() {
+            var pixText = document.getElementById("pixModalKey").innerText;
+            navigator.clipboard.writeText(pixText).then(function() {
+                alert("Chave PIX copiada: " + pixText);
+            }).catch(function() {
+                alert("Erro ao copiar. Copie manualmente: " + pixText);
+            });
+        }
+    </script>
 </body>
 </html>

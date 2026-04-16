@@ -4060,6 +4060,14 @@ def encurtar_url(url):
     except:
         pass
     return url
+@app.route('/avaliacao/excluir/<int:avaliacao_id>', methods=['POST'])
+@login_required
+def excluir_avaliacao(avaliacao_id):
+    avaliacao = AvaliacaoPsicossocial.query.get_or_404(avaliacao_id)
+    db.session.delete(avaliacao)
+    db.session.commit()
+    flash('Avaliação excluída com sucesso!', 'success')
+    return redirect(url_for('listar_avaliacoes'))
 ########################################################   ROTAS DE EPI ####################################
 # Importações necessárias (certifique-se de que todas estão no topo do arquivo)
 from flask import render_template, make_response, redirect, url_for, flash, request
