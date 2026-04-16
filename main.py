@@ -1,92 +1,88 @@
 # ================= IMPORTAÇÕES PADRÃO =================
+import hashlib
+import json
 import os
 import re
-import json
 import secrets
-import hashlib
 import sqlite3
 from datetime import datetime, timedelta
-from io import BytesIO
 from functools import wraps
+from io import BytesIO
 
-# ================= IMPORTAÇÕES FLASK =================
-from flask import Flask, send_file, session, request, flash, redirect, url_for, render_template, Response, make_response
-
-# ================= IMPORTAÇÕES FLASK-LOGIN =================
-from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
-
-# ================= IMPORTAÇÕES SQLALCHEMY =================
-from sqlalchemy.exc import IntegrityError
-
-# ================= IMPORTAÇÕES WERKZEUG =================
-from werkzeug.utils import secure_filename
-
-# ================= IMPORTAÇÕES REPORTLAB =================
-from reportlab.lib.pagesizes import A4
+# ================= IMPORTAÇÕES DE TERCEIROS =================
+from flask import Flask, flash, jsonify, make_response, redirect, render_template, request, Response, send_file, session, url_for
+from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user, current_user
+from flask_mail import Mail, Message
+from flask_sqlalchemy import SQLAlchemy
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
-# Topo do arquivo main.py
-from datetime import datetime  # ← Se tiver aqui, não precisa dentro da função
-# ================= IMPORTAÇÕES DOCX =================
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from sqlalchemy.exc import IntegrityError
+from werkzeug.utils import secure_filename
 from docx import Document
 from docx.shared import Inches
-from models import Cliente, AvaliacaoPsicossocial
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from datetime import datetime, timedelta
-import hashlib
-import secrets
-from flask_mail import Mail, Message  # ← ADICIONE ESTA LINHA
-from models import EPIEntrega, Funcionario  # junto com seus outros modelos
-# ... resto das importações
+
 # ================= IMPORTAÇÕES DOS MODELOS =================
 from models import (
-    db,
-    Usuario,
-    Empresa,
-    Funcionario,
-    EventoS2220,
-    S2220Exame,
-    EventoS2221,
-    EventoS2210,
-    EventoS2240,
-    RiscoS2240,
+    AvaliacaoPsicossocial,
+    Cliente,
     ConfigCertificado,
     ConfigSistema,
+    db,
+    Empresa,
+    EPIEntrega,
+    EventoS2210,
+    EventoS2220,
+    EventoS2221,
+    EventoS2240,
+    Funcionario,
     ModeloDocumento,
-    ReciboEnvio
+    ReciboEnvio,
+    RiscoS2240,
+    S2220Exame,
+    Usuario,
 )
 
-# ================= IMPORTAÇÕES UTILITÁRIOS =================
+# ================= IMPORTAÇÕES DE UTILITÁRIOS DO eSocial =================
 from esocial_utils import (
-    carregar_certificado,
     assinar_xml,
+    carregar_certificado,
+    enviar_lote,
+    gerar_xml_s2210,
     gerar_xml_s2220,
     gerar_xml_s2221,
-    gerar_xml_s2210,
     gerar_xml_s2240,
-    enviar_lote
 )
 
-# ================= INICIALIZAÇÃO DO FLASK =================
+# ================= CONFIGURAÇÃO DO FLASK =================
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'sua-chave-secreta-aqui'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/sst2.db'
+app.config['SECRET_KEY'] = 'chave-secreta-mude-em-producao-123456'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sst2.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# Configuração do domínio para links externos
-# Inicializar banco de dados
+app.config['UPLOAD_FOLDER'] = os.path.join(app.instance_path, 'certs')
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024   # 100 MB (opcional, mas recomendado)
+
+# Garante que a pasta de upload existe
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# ================= INICIALIZAÇÃO DO BANCO =================
 db.init_app(app)
+from flask_migrate import Migrate
+migrate = Migrate(app, db)
 
 # ================= CONFIGURAÇÃO DO LOGIN =================
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# ================= CONFIGURAÇÃO DO E-MAIL (se for usar) =================
+# mail = Mail(app)  # Descomente se for usar
+
+# ================= CARREGADOR DE USUÁRIO =================
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(Usuario, int(user_id))
@@ -97,27 +93,13 @@ def validar_cpf(cpf):
     if not cpf:
         return False
     cpf = ''.join(filter(str.isdigit, cpf))
-    if len(cpf) != 11:
-        return False
-    return True
+    return len(cpf) == 11
 
 # ================= FUNÇÃO PARA GERAR PDF DO S-2220 =================
 def gerar_pdf_s2220(evento):
     """Gera PDF do ASO (S-2220) - Com assinatura do funcionário"""
-    # Coloque aqui a função completa que criamos anteriormente
-    # ... (código completo da função gerar_pdf_s2220)
-    pass  # Substitua pelo código completo
-
-# ================= ROTAS DO SISTEMA =================
-# Suas rotas aqui...
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'chave-secreta-mude-em-producao-123456'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sst2.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = os.path.join(app.instance_path, 'certs')
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-db.init_app(app)
+    # ... (implementação da função)
+    pass
 
 # Configuração de email (para recuperação de senha)
 # Configuração de email (para recuperação de senha)
@@ -220,7 +202,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB
 
 def enviar_email_recuperacao(email_destino, token):
     link_recuperacao = f"http://localhost:5000/redefinir-senha/{token}"
@@ -4223,3 +4205,4 @@ def esqueci_senha():
 # ================= EXECUÇÃO =================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+

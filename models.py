@@ -202,18 +202,17 @@ class ModeloDocumento(db.Model):
     descricao = db.Column(db.String(500))
     tipo = db.Column(db.String(20), nullable=False)  # 'pdf', 'word', 'ambos'
     categoria = db.Column(db.String(50))  # 'aso', 'cat', 'ppra', 'pcMSO', 'outro'
-    arquivo_path = db.Column(db.String(500), nullable=False)
-    arquivo_word_path = db.Column(db.String(500))
+    arquivo_path = db.Column(db.String(500), nullable=True)   # <-- ALTERADO: nullable=True
+    arquivo_word_path = db.Column(db.String(500), nullable=True)
     versao = db.Column(db.String(20), default='1.0')
     ativo = db.Column(db.Boolean, default=True)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     criado_por = db.Column(db.Integer)
-    campos_variaveis = db.Column(db.Text)  # ADICIONE ESTA LINHA
+    campos_variaveis = db.Column(db.Text)
 
     def __repr__(self):
         return f'<ModeloDocumento {self.nome}>'
-
 
 # Adicione ao models.py
 class Cliente(db.Model):
