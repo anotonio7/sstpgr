@@ -39,9 +39,14 @@
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
                                 <a href="{{ url_for('edit_s2240', id=evento.id) }}" class="btn btn-warning">✏️ Editar</a>
-                                <a href="{{ url_for('delete_s2240', id=evento.id) }}" class="btn btn-danger" onclick="return confirm('Confirmar exclusão?')">🗑️ Excluir</a>
 
-                                <!-- Botão para visualizar XML -->
+                                <!-- Formulário para exclusão via POST -->
+                                <form action="{{ url_for('delete_s2240', id=evento.id) }}" method="POST" style="display: inline;">
+                                    <button type="submit" class="btn btn-danger" onclick="return confirm('Confirmar exclusão?')">
+                                        🗑️ Excluir
+                                    </button>
+                                </form>
+
                                 <a href="{{ url_for('view_xml_s2240', id=evento.id) }}" class="btn btn-info" target="_blank">📄 XML</a>
 
                                 {% if evento.status != 'enviado' %}

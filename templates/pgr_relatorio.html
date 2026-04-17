@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>PGR - {{ empresa.razao_social }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 10pt; margin: 2cm; }
+        h1, h2, h3 { color: #2c3e50; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .confidencial { text-align: right; font-size: 8pt; color: red; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #aaa; padding: 6px; text-align: left; }
+        th { background-color: #f0f0f0; }
+        .footer { text-align: center; font-size: 8pt; margin-top: 30px; }
+        .page-break { page-break-before: always; }
+    </style>
+</head>
+<body>
+<div class="confidencial">Confidencial - Uso interno PGR - Conforme NR-01 v1.0</div>
+
+<div class="header">
+    <h1>PROGRAMA DE GERENCIAMENTO DE RISCOS (PGR)</h1>
+    <p><strong>EMPRESA:</strong> {{ empresa.razao_social }}</p>
+    <p><strong>CNPJ:</strong> {{ empresa.cnpj }}</p>
+    <p><strong>ENDEREÇO:</strong> {{ empresa.endereco or 'Não informado' }}</p>
+    <p><strong>DATA DE ELABORAÇÃO:</strong> {{ data_geracao.strftime('%d/%m/%Y') }}</p>
+    <hr>
+</div>
+
+<h2>SUMÁRIO EXECUTIVO</h2>
+<p>Total de Riscos: {{ total_riscos }}</p>
+<p>Críticos/Altos: {{ criticos_altos }} | Médios: {{ medios }} | Baixos: {{ baixos }}</p>
+
+<h2>INVENTÁRIO DETALHADO DE RISCOS</h2>
+<table>
+    <thead>
+        <tr><th>Setor</th><th>Descrição do Risco</th><th>Nível</th></tr>
+    </thead>
+    <tbody>
+        {% for risco in riscos %}
+        <tr>
+            <td>{{ risco.setor }}</td>
+            <td>{{ risco.descricao }}</td>
+            <td>{{ risco.nivel }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3">Nenhum risco cadastrado</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>AVALIAÇÃO DE RISCOS PSICOSSOCIAIS</h2>
+{% for aval in psicossociais %}
+    <p>
+        <strong>Setor:</strong> {{ aval.setor if aval.setor else 'Não informado' }} -
+        <strong>Data:</strong>
+        {% if aval.data_avaliacao %}
+            {{ aval.data_avaliacao.strftime('%d/%m/%Y') }}
+        {% elif aval.created_at %}
+            {{ aval.created_at.strftime('%d/%m/%Y') }}
+        {% else %}
+            Data não informada
+        {% endif %}
+    </p>
+    <p>
+        Demanda: {{ aval.demanda if aval.demanda else 'Não informada' }} |
+        Autonomia: {{ aval.autonomia if aval.autonomia else 'Não informada' }} |
+        Suporte: {{ aval.suporte if aval.suporte else 'Não informado' }}
+    </p>
+    <p>Recomendações: {{ aval.recomendacoes if aval.recomendacoes else 'Não informadas' }}</p>
+    <hr>
+{% else %}
+    <p>Nenhuma avaliação psicossocial cadastrada.</p>
+{% endfor %}
+
+<!-- Seções fixas (Fundamentação legal, NR-1, NR-7, NR-9, NR-17, etc.) -->
+<div class="page-break"></div>
+<h2>FUNDAMENTAÇÃO LEGAL E NORMATIVA</h2>
+<p>Conforme NR-01, NR-07, NR-09, NR-17... (insira o texto completo que você já possui)</p>
+
+<div class="footer">
+    PGR - {{ empresa.razao_social }} - Gerado em {{ data_geracao.strftime('%d/%m/%Y') }}
+</div>
+</body>
+</html>

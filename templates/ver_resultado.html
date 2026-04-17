@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h4><i class="bi bi-clipboard-data"></i> Resultado da Avaliação Psicossocial</h4>
+        </div>
+        <div class="card-body">
+            <!-- Dados do funcionário -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <p><strong>Funcionário:</strong> {{ avaliacao.nome_funcionario }}</p>
+                    <p><strong>Email:</strong> {{ avaliacao.email_funcionario or 'Não informado' }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Cargo:</strong> {{ avaliacao.cargo }}</p>
+                    <p><strong>Setor:</strong> {{ avaliacao.setor }}</p>
+                </div>
+            </div>
+
+            <!-- Pontuação e nível de risco -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card text-white bg-secondary">
+                        <div class="card-body text-center">
+                            <h5>Pontuação Total</h5>
+                            <h2>{{ avaliacao.pontuacao_total or 0 }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card text-white
+                        {% if avaliacao.nivel_risco == 'Baixo' %}bg-success
+                        {% elif avaliacao.nivel_risco == 'Médio' %}bg-warning
+                        {% elif avaliacao.nivel_risco == 'Alto' %}bg-danger
+                        {% elif avaliacao.nivel_risco == 'Crítico' %}bg-dark
+                        {% else %}bg-secondary{% endif %}">
+                        <div class="card-body text-center">
+                            <h5>Nível de Risco</h5>
+                            <h2>{{ avaliacao.nivel_risco or 'Não classificado' }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dimensões avaliadas (ajuste conforme os campos reais da sua tabela) -->
+            <h5>Dimensões Avaliadas</h5>
+            <table class="table table-bordered">
+                <thead class="table-light">
+                    <tr><th>Dimensão</th><th>Pontuação</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Demanda</td>
+                        <td>{{ avaliacao.demanda or '-' }}</td>
+                        <td>{% if (avaliacao.demanda|default(0)) > 3.5 %}⚠️ Alta{% else %}✅ Adequada{% endif %}</td>
+                    </tr>
+                    <tr><td>Autonomia</td>
+                        <td>{{ avaliacao.autonomia or '-' }}</td>
+                        <td>{% if (avaliacao.autonomia|default(0)) < 2.5 %}⚠️ Baixa{% else %}✅ Adequada{% endif %}</td>
+                    </tr>
+                    <tr><td>Suporte Social</td>
+                        <td>{{ avaliacao.suporte or '-' }}</td>
+                        <td>{% if (avaliacao.suporte|default(0)) < 2.5 %}⚠️ Insuficiente{% else %}✅ Adequado{% endif %}</td>
+                    </tr>
+                    <tr><td>Recompensa</td>
+                        <td>{{ avaliacao.recompensa or '-' }}</td>
+                        <td>{% if (avaliacao.recompensa|default(0)) < 2.5 %}⚠️ Baixa{% else %}✅ Adequada{% endif %}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Recomendações -->
+            <h5>Recomendações</h5>
+            <div class="alert alert-info">
+                {{ avaliacao.recomendacoes or 'Nenhuma recomendação registrada.' }}
+            </div>
+
+            <!-- Botões de ação -->
+            <div class="mt-4">
+                <a href="{{ url_for('listar_avaliacoes_psicossociais') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+                <a href="{{ url_for('gerar_pdf_resultado', avaliacao_id=avaliacao.id) }}" class="btn btn-danger" target="_blank">
+                    <i class="bi bi-file-pdf"></i> Baixar PDF
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

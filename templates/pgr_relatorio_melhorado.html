@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>PGR - {{ empresa.razao_social }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 10pt;
+            margin: 1.5cm;
+            background: #f9fafb;
+            color: #1f2937;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 { font-size: 24pt; margin-bottom: 10px; }
+        .confidencial {
+            text-align: right;
+            font-size: 8pt;
+            color: #ef4444;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+        .card h2 {
+            font-size: 16pt;
+            border-left: 5px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 20px;
+            color: #1e3a8a;
+        }
+        .grid-2 {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .grid-2 > div { flex: 1; min-width: 250px; }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: #f3f4f6;
+            border-radius: 12px;
+            padding: 15px;
+            width: 22%;
+        }
+        .stat-number { font-size: 28pt; font-weight: bold; color: #1f2937; }
+        .stat-label { font-size: 9pt; color: #4b5563; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #e5e7eb;
+            padding: 8px 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+        }
+        .chart-container {
+            text-align: center;
+            margin: 20px 0;
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 12px;
+        }
+        .chart-container img { max-width: 100%; height: auto; }
+        .footer {
+            text-align: center;
+            font-size: 8pt;
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            color: #6b7280;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 8pt;
+            font-weight: bold;
+        }
+        .badge-critico { background: #fee2e2; color: #b91c1c; }
+        .badge-alto { background: #ffedd5; color: #c2410c; }
+        .badge-medio { background: #fef9c3; color: #854d0e; }
+        .badge-baixo { background: #dcfce7; color: #166534; }
+        .alert-box {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="confidencial">Confidencial - Uso interno PGR - Conforme NR-01 v1.0</div>
+
+<div class="header">
+    <h1>PROGRAMA DE GERENCIAMENTO DE RISCOS</h1>
+    <p><strong>{{ empresa.razao_social }}</strong></p>
+    <p>CNPJ: {{ empresa.cnpj }} | {{ empresa.endereco or 'Endereço não informado' }}</p>
+    <p>Gerado em: {{ data_geracao.strftime('%d/%m/%Y às %H:%M') }}</p>
+</div>
+
+<div class="container">
+    <!-- SUMÁRIO EXECUTIVO -->
+    <div class="card">
+        <h2>📊 Sumário Executivo</h2>
+        <div class="stats">
+            <div class="stat-box"><div class="stat-number">{{ total_riscos }}</div><div class="stat-label">Total de Riscos</div></div>
+            <div class="stat-box"><div class="stat-number">{{ criticos_altos }}</div><div class="stat-label">Críticos/Altos</div></div>
+            <div class="stat-box"><div class="stat-number">{{ medios }}</div><div class="stat-label">Médios</div></div>
+            <div class="stat-box"><div class="stat-number">{{ baixos }}</div><div class="stat-label">Baixos</div></div>
+        </div>
+        {% if criticos_altos > 0 %}
+        <div class="alert-box">
+            ⚠️ Atenção: Existem {{ criticos_altos }} riscos classificados como Críticos ou Altos. Ações imediatas são recomendadas.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- GRÁFICOS DE RISCOS -->
+    <div class="card">
+        <h2>📈 Análise de Riscos Ocupacionais</h2>
+        <div class="grid-2">
+            <div class="chart-container">
+                <h3>Distribuição por Nível</h3>
+                <img src="data:image/png;base64,{{ pie_chart }}" alt="Gráfico de Pizza">
+            </div>
+            {% if bar_chart %}
+            <div class="chart-container">
+                <h3>Riscos por Setor (top 6)</h3>
+                <img src="data:image/png;base64,{{ bar_chart }}" alt="Gráfico de Barras">
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- INVENTÁRIO DE RISCOS -->
+    <div class="card">
+        <h2>📋 Inventário Detalhado de Riscos</h2>
+        <table>
+            <thead><tr><th>Setor</th><th>Descrição do Risco</th><th>Nível</th></tr></thead>
+            <tbody>
+            {% for risco in riscos %}
+            <tr>
+                <td>{{ risco.setor }}</td>
+                <td>{{ risco.descricao }}</td>
+                <td><span class="badge
+                    {% if risco.nivel == 'Crítico' %}badge-critico
+                    {% elif risco.nivel == 'Alto' %}badge-alto
+                    {% elif risco.nivel == 'Médio' %}badge-medio
+                    {% else %}badge-baixo{% endif %}">{{ risco.nivel }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3">Nenhum risco cadastrado para esta empresa.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- AVALIAÇÃO PSICOSSOCIAL -->
+    <div class="card">
+        <h2>🧠 Avaliação de Riscos Psicossociais</h2>
+
+        {% if psicossociais %}
+        <div class="grid-2">
+            <div class="chart-container">
+                <h3>Perfil Psicossocial - Médias Globais</h3>
+                <img src="data:image/png;base64,{{ bar_psi_chart }}" alt="Gráfico Barras Psicossocial">
+            </div>
+            <div class="chart-container">
+                <h3>Comparativo por Dimensão (Radar)</h3>
+                <img src="data:image/png;base64,{{ radar_chart }}" alt="Gráfico Radar">
+            </div>
+        </div>
+
+        <!-- Tabela resumo por setor -->
+        <h3>📌 Resumo por Setor</h3>
+        <table>
+            <thead>
+                <tr><th>Setor</th><th>Demanda</th><th>Autonomia</th><th>Suporte</th><th>Recompensa</th><th>Nº Avaliações</th></tr>
+            </thead>
+            <tbody>
+            {% for setor in resumo_setores %}
+            <tr>
+                <td>{{ setor.setor }}</td>
+                <td>{{ "%.1f"|format(setor.demanda) }}</td>
+                <td>{{ "%.1f"|format(setor.autonomia) }}</td>
+                <td>{{ "%.1f"|format(setor.suporte) }}</td>
+                <td>{{ "%.1f"|format(setor.recompensa) }}</td>
+                <td>{{ setor.n_avaliacoes }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Alertas psicossociais -->
+        {% if medias_globais.demanda > 4 %}
+        <div class="alert-box">⚠️ Alta demanda percebida (média {{ "%.1f"|format(medias_globais.demanda) }}/5). Avaliar redistribuição de tarefas.</div>
+        {% endif %}
+        {% if medias_globais.autonomia < 2.5 %}
+        <div class="alert-box">⚠️ Baixa autonomia (média {{ "%.1f"|format(medias_globais.autonomia) }}/5). Incentivar participação nas decisões.</div>
+        {% endif %}
+
+        <!-- Recomendações individuais -->
+        <h3>📝 Recomendações das Avaliações</h3>
+        {% for aval in psicossociais %}
+        {% if aval.recomendacoes %}
+        <p><strong>{{ aval.setor }} ({{ aval.data.strftime('%d/%m/%Y') if aval.data else 'data não informada' }}):</strong> {{ aval.recomendacoes }}</p>
+        {% endif %}
+        {% endfor %}
+        {% else %}
+        <p>Nenhuma avaliação psicossocial registrada para esta empresa.</p>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        PGR - {{ empresa.razao_social }} - Documento gerado em {{ data_geracao.strftime('%d/%m/%Y') }} - Conforme NR-01, NR-07, NR-09 e NR-17.
+    </div>
+</div>
+</body>
+</html>

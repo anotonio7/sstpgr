@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>PGR - {{ empresa.razao_social }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 10pt; margin: 2cm; }
+        h1, h2, h3 { color: #2c3e50; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .confidencial { text-align: right; font-size: 8pt; color: red; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #aaa; padding: 6px; text-align: left; }
+        th { background-color: #f0f0f0; }
+        .footer { text-align: center; font-size: 8pt; margin-top: 30px; }
+        .page-break { page-break-before: always; }
+        .chart-container { text-align: center; margin: 20px 0; }
+        .chart-container img { max-width: 100%; height: auto; }
+    </style>
+</head>
+<body>
+<div class="confidencial">Confidencial - Uso interno PGR - Conforme NR-01 v1.0</div>
+
+<div class="header">
+    <h1>PROGRAMA DE GERENCIAMENTO DE RISCOS (PGR)</h1>
+    <p><strong>EMPRESA:</strong> {{ empresa.razao_social }}</p>
+    <p><strong>CNPJ:</strong> {{ empresa.cnpj }}</p>
+    <p><strong>ENDEREÇO:</strong> {{ empresa.endereco or 'Não informado' }}</p>
+    <p><strong>DATA DE ELABORAÇÃO:</strong> {{ data_geracao.strftime('%d/%m/%Y') }}</p>
+    <hr>
+</div>
+
+<h2>SUMÁRIO EXECUTIVO</h2>
+<p>Total de Riscos: {{ total_riscos }}</p>
+<p>Críticos/Altos: {{ criticos_altos }} | Médios: {{ medios }} | Baixos: {{ baixos }}</p>
+
+<h2>GRÁFICOS ESTATÍSTICOS</h2>
+{% if pie_chart and pie_chart != 'None' %}
+<div class="chart-container">
+    <h3>Distribuição por Nível de Risco</h3>
+    <img src="data:image/png;base64,{{ pie_chart }}" alt="Gráfico de Pizza">
+</div>
+{% endif %}
+
+{% if bar_chart and bar_chart != 'None' %}
+<div class="chart-container">
+    <h3>Riscos por Setor</h3>
+    <img src="data:image/png;base64,{{ bar_chart }}" alt="Gráfico de Barras">
+</div>
+{% endif %}
+
+<h2>INVENTÁRIO DETALHADO DE RISCOS</h2>
+<table>
+    <thead>
+        <tr><th>Setor</th><th>Descrição do Risco</th><th>Nível</th></tr>
+    </thead>
+    <tbody>
+        {% for risco in riscos %}
+        <tr>
+            <td>{{ risco.setor }}</td>
+            <td>{{ risco.descricao }}</td>
+            <td>{{ risco.nivel }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3">Nenhum risco cadastrado</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>AVALIAÇÃO DE RISCOS PSICOSSOCIAIS</h2>
+{% for aval in psicossociais %}
+    <p>
+        <strong>Setor:</strong> {{ aval.setor or 'Não informado' }}<br>
+        <strong>Data:</strong> {{ aval.data_avaliacao.strftime('%d/%m/%Y') if aval.data_avaliacao else 'Não informada' }}<br>
+        <strong>Demanda:</strong> {{ aval.demanda or 'N/I' }} |
+        <strong>Autonomia:</strong> {{ aval.autonomia or 'N/I' }} |
+        <strong>Suporte:</strong> {{ aval.suporte or 'N/I' }}
+    </p>
+    <p><strong>Recomendações:</strong> {{ aval.recomendacoes or 'Não informadas' }}</p>
+    <hr>
+{% else %}
+    <p>Nenhuma avaliação psicossocial cadastrada.</p>
+{% endfor %}
+
+<div class="footer">
+    PGR - {{ empresa.razao_social }} - Gerado em {{ data_geracao.strftime('%d/%m/%Y') }}
+</div>
+</body>
+</html>

@@ -52,11 +52,14 @@
                             </td>
                             <td>
                                 {% if a.status == 'pendente' %}
-                                    <a href="{{ url_for('reenviar_link_avaliacao', id=a.id) }}" class="btn btn-sm btn-warning">
-                                        <i class="bi bi-envelope"></i> Reenviar
+                                    <a href="{{ url_for('ver_resultado', id=a.id) }}" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-eye"></i> Ver resultado
                                     </a>
+                                    <button class="btn btn-sm btn-secondary" onclick="reenviarConvite({{ a.id }})">
+                                        <i class="bi bi-envelope"></i> Reenviar
+                                    </button>
                                 {% else %}
-                                    <a href="{{ url_for('ver_resultado', avaliacao_id=a.id) }}" class="btn btn-sm btn-info">
+                                    <a href="{{ url_for('ver_resultado', id=a.id) }}" class="btn btn-sm btn-info">
                                         <i class="bi bi-eye"></i> Ver
                                     </a>
                                     <a href="{{ url_for('gerar_pdf_resultado', avaliacao_id=a.id) }}" class="btn btn-sm btn-danger" target="_blank">
@@ -64,7 +67,7 @@
                                     </a>
                                 {% endif %}
 
-                                <!-- Botão de excluir (sempre visível, com confirmação) -->
+                                <!-- Excluir -->
                                 <form method="POST" action="{{ url_for('excluir_avaliacao', avaliacao_id=a.id) }}" style="display: inline-block;" onsubmit="return confirm('Tem certeza que deseja excluir esta avaliação? Essa ação não pode ser desfeita.');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
                                         <i class="bi bi-trash"></i> Excluir
@@ -85,4 +88,21 @@
         </div>
     </div>
 </div>
+
+<script>
+function reenviarConvite(avaliacaoId) {
+    if (confirm('Reenviar o convite para o funcionário preencher o questionário?')) {
+        fetch(`/reenviar-convite/${avaliacaoId}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Convite reenviado com sucesso!');
+                } else {
+                    alert('Erro ao reenviar: ' + data.message);
+                }
+            })
+            .catch(error => alert('Erro ao reenviar.'));
+    }
+}
+</script>
 {% endblock %}

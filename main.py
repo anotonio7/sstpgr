@@ -25,7 +25,8 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
 from docx import Document
 from docx.shared import Inches
-
+# No topo do main.py
+import base64
 # ================= IMPORTAÇÕES DOS MODELOS =================
 from models import (
     AvaliacaoPsicossocial,
@@ -332,19 +333,23 @@ def redefinir_senha(token):
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-        nova_senha = request.form['nova_senha']
-        confirmar_senha = request.form['confirmar_senha']
+        # Usa .get() para evitar KeyError e padroniza os nomes dos campos
+        nova_senha = request.form.get('senha')
+        confirmar_senha = request.form.get('confirmar_senha')
 
-        if len(nova_senha) < 6:
-            flash('Senha deve ter pelo menos 6 caracteres', 'danger')
+        # Validações
+        if not nova_senha or not confirmar_senha:
+            flash('Preencha ambos os campos de senha.', 'danger')
+        elif len(nova_senha) < 6:
+            flash('A senha deve ter pelo menos 6 caracteres.', 'danger')
         elif nova_senha != confirmar_senha:
-            flash('Senhas não conferem', 'danger')
+            flash('As senhas não conferem.', 'danger')
         else:
             senha_hash = hashlib.sha256(nova_senha.encode()).hexdigest()
             c.execute("UPDATE usuarios SET senha = ?, reset_token = NULL, reset_token_expira = NULL WHERE id = ?",
                       (senha_hash, usuario[0]))
             conn.commit()
-            flash('Senha redefinida com sucesso! Faça login', 'success')
+            flash('Senha redefinida com sucesso! Faça login.', 'success')
             return redirect(url_for('login'))
 
     conn.close()
@@ -549,25 +554,57 @@ def list_funcionarios():
 
 # Depois, substitua toda a rota:
 
+from datetime import datetime
+import re
+from sqlalchemy.exc import IntegrityError
+
+def somente_numeros(valor):
+    return re.sub(r'\D', '', valor or '')
+
 @app.route('/funcionario/create', methods=['GET', 'POST'])
 @login_required
 def create_funcionario():
     if request.method == 'POST':
         try:
-            # Converter strings de data para objetos date
+            # =========================
+            # DADOS DO FORM
+            # =========================
+            nome = request.form.get('nome')
+            cpf = somente_numeros(request.form.get('cpf'))
+            matricula = request.form.get('matricula_esocial')
+            cbo = request.form.get('cbo')
+            funcao = request.form.get('funcao')
+            empresa_id = request.form.get('empresa_id')
+
+            # =========================
+            # DATAS
+            # =========================
             nascimento = datetime.strptime(request.form['nascimento'], '%Y-%m-%d').date()
             admissao = datetime.strptime(request.form['admissao'], '%Y-%m-%d').date()
 
-            # Criar novo funcionário com datas convertidas
+            # =========================
+            # VALIDAÇÕES
+            # =========================
+            if not nome or not cpf or not matricula:
+                flash('Nome, CPF e Matrícula são obrigatórios!', 'error')
+                return redirect(url_for('create_funcionario'))
+
+            if len(cpf) != 11:
+                flash('CPF inválido!', 'error')
+                return redirect(url_for('create_funcionario'))
+
+            # =========================
+            # CRIAR FUNCIONÁRIO
+            # =========================
             funcionario = Funcionario(
-                nome=request.form['nome'],
-                cpf=request.form['cpf'],
-                matricula_esocial=request.form.get('matricula_esocial', ''),
-                cbo=request.form['cbo'],
-                nascimento=nascimento,  # Agora é objeto date
-                admissao=admissao,  # Agora é objeto date
-                funcao=request.form['funcao'],
-                empresa_id=int(request.form['empresa_id'])
+                nome=nome,
+                cpf=cpf,
+                matricula_esocial=matricula,
+                cbo=cbo,
+                nascimento=nascimento,
+                admissao=admissao,
+                funcao=funcao,
+                empresa_id=int(empresa_id)
             )
 
             db.session.add(funcionario)
@@ -581,9 +618,9 @@ def create_funcionario():
             flash('Erro: CPF já cadastrado no sistema!', 'error')
             return redirect(url_for('create_funcionario'))
 
-        except ValueError as e:
+        except ValueError:
             db.session.rollback()
-            flash(f'Erro no formato das datas: {str(e)}', 'error')
+            flash('Erro no formato das datas!', 'error')
             return redirect(url_for('create_funcionario'))
 
         except Exception as e:
@@ -591,10 +628,8 @@ def create_funcionario():
             flash(f'Erro ao cadastrar funcionário: {str(e)}', 'error')
             return redirect(url_for('create_funcionario'))
 
-    # GET request - mostrar formulário
     empresas = Empresa.query.all()
     return render_template('funcionario/create.html', empresas=empresas)
-
 
 @app.route('/funcionario/edit/<int:id>', methods=['GET', 'POST'])  # <-- IMPORTANTE: tem que ter GET e POST
 def edit_funcionario(id):
@@ -1052,15 +1087,10 @@ def download_xml_s2220(id):
         flash(f'Erro ao gerar XML: {str(e)}', 'error')
         return redirect(url_for('list_s2220'))
 
-@app.route('/s2220/view_xml/<int:id>')
-@login_required
-def view_xml_s2220(id):
-    evento = EventoS2220.query.get_or_404(id)
-    funcionario = evento.funcionario
-    empresa = funcionario.empresa
-    xml_str = gerar_xml_s2220(evento, empresa, funcionario, ambiente='2')
-    return Response(xml_str, mimetype='application/xml')
 
+@app.route('/avaliacoes-psicossociais')
+def listar_avaliacoes_psicossociais():  # se for este o nome, use 'listar_avaliacoes_psicossociais'
+    ...
 
 @app.route('/s2220/send/<int:id>')
 @login_required
@@ -1585,56 +1615,8 @@ def processar_s2221():
     except Exception as e:
         print(f"Erro inesperado: {str(e)}")
         return f"Erro interno do servidor: {str(e)}", 500
-@app.route('/s2221/view_xml/<int:id>')
-@login_required
-def view_xml_s2221(id):
-    """Visualizar XML do evento S-2221"""
-    try:
-        evento = EventoS2221.query.get_or_404(id)
-        funcionario = evento.funcionario
-        empresa = funcionario.empresa
-        xml_str = gerar_xml_s2221(evento, empresa, funcionario, '2')
-        return Response(xml_str, mimetype='application/xml')
-    except Exception as e:
-        flash(f'Erro ao gerar XML: {str(e)}', 'danger')
-        return redirect(url_for('list_s2221'))
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
 
-def gerar_xml_s2221(evento, empresa, funcionario, ambiente='2'):
-    """Gera XML do evento S-2221 (exame toxicológico)"""
-    ns = 'http://www.esocial.gov.br/schema/evt/exmTox/v02_02_00'
-    ET.register_namespace('', ns)
 
-    root = ET.Element('eSocial', xmlns=ns)
-    evento_elem = ET.SubElement(root, 'evtExmTox')
-    ET.SubElement(evento_elem, 'Id').text = f"ID{evento.id:08d}"
-
-    ide_evento = ET.SubElement(evento_elem, 'ideEvento')
-    ET.SubElement(ide_evento, 'indRetif').text = '1'
-    ET.SubElement(ide_evento, 'nrRecibo').text = ''
-    ET.SubElement(ide_evento, 'tpAmb').text = ambiente
-    ET.SubElement(ide_evento, 'procEmi').text = '1'
-    ET.SubElement(ide_evento, 'verProc').text = '1.0.0'
-
-    ide_empregador = ET.SubElement(evento_elem, 'ideEmpregador')
-    ET.SubElement(ide_empregador, 'tpInsc').text = '1'
-    ET.SubElement(ide_empregador, 'nrInsc').text = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
-
-    ide_trab = ET.SubElement(evento_elem, 'ideTrabalhador')
-    ET.SubElement(ide_trab, 'cpfTrab').text = funcionario.cpf.replace('.', '').replace('-', '')
-    ET.SubElement(ide_trab, 'matricula').text = funcionario.matricula_esocial or ''
-
-    info_exm_tox = ET.SubElement(evento_elem, 'infoExmTox')
-    ET.SubElement(info_exm_tox, 'dtExm').text = evento.data_exame.strftime('%Y-%m-%d')
-    ET.SubElement(info_exm_tox, 'tpExmTox').text = evento.tipo_exame
-    ET.SubElement(info_exm_tox, 'resExmTox').text = evento.resultado
-    ET.SubElement(info_exm_tox, 'laboratorio').text = evento.laboratorio or ''
-    ET.SubElement(info_exm_tox, 'cpfResp').text = evento.cpf_responsavel.replace('.', '').replace('-', '')
-
-    xml_str = ET.tostring(root, encoding='unicode')
-    dom = minidom.parseString(xml_str)
-    return dom.toprettyxml(indent="  ")
 ########################################################### EVENTO S 2220 #############################
 def gerar_xml_s2220(evento, empresa, funcionario, ambiente='2'):
     """
@@ -1961,7 +1943,8 @@ def processar_s2210():
         return f"Erro interno do servidor: {str(e)}", 500
 
 
-# ================= ROTAS S-2240 =================
+####################################################### ================= ROTAS S-2240 =================
+
 TABELA_24_AGENTES = RISCOS_OCUPACIONAIS = [
     # Código especial para NENHUM RISCO
     {"codigo": "00.00.000", "descricao": "Nenhum risco identificado"},
@@ -2041,15 +2024,18 @@ def create_s2240():
                            tabela24=TABELA_24_AGENTES)
 
 
-@app.route('/s2240/delete/<int:id>')
+@app.route('/s2240/delete/<int:id>', methods=['POST'])
 @login_required
 def delete_s2240(id):
     evento = EventoS2240.query.get_or_404(id)
-    db.session.delete(evento)
-    db.session.commit()
-    flash('Evento S-2240 excluído!')
+    try:
+        db.session.delete(evento)
+        db.session.commit()
+        flash('Evento excluído com sucesso.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir: {str(e)}', 'danger')
     return redirect(url_for('list_s2240'))
-
 
 @app.route('/s2240/send/<int:id>')
 @login_required
@@ -2216,20 +2202,27 @@ def enviar_xml_manual():
             flash(f'Erro ao enviar: {str(e)}', 'danger')
         return redirect(url_for('enviar_xml_manual'))
     return render_template('enviar_xml_manual.html')
-@app.route('/s2240/edit/<int:id>', methods=['GET', 'POST'])
+
+
+@app.route('/s2240/edit/<int:id>')
 @login_required
 def edit_s2240(id):
     evento = EventoS2240.query.get_or_404(id)
     funcionarios = Funcionario.query.all()
-    if request.method == 'POST':
-        evento.funcionario_id = request.form['funcionario_id']
-        evento.data_avaliacao = datetime.strptime(request.form['data_avaliacao'], '%Y-%m-%d').date()
-        evento.cpf_avaliador = request.form['cpf_avaliador']
-        db.session.commit()
-        flash('Evento S-2240 atualizado!', 'success')
-        return redirect(url_for('list_s2240'))
-    return render_template('eventos/s2240_edit.html', evento=evento, funcionarios=funcionarios)
 
+    # Carrega riscos existentes (salvos como JSON)
+    riscos_existentes = []
+    if hasattr(evento, 'riscos_json') and evento.riscos_json:
+        try:
+            riscos_existentes = evento.riscos_json
+        except:
+            riscos_existentes = []
+
+    return render_template('eventos/s2240_edit.html',
+                           evento=evento,
+                           funcionarios=funcionarios,
+                           tabela24=RISCOS_OCUPACIONAIS,
+                           riscos=riscos_existentes)
 
 def validar_cpf(cpf: str) -> bool:
     """
@@ -2265,40 +2258,75 @@ def validar_cpf(cpf: str) -> bool:
 def gerar_xml_s2240(evento, empresa, funcionario, ambiente='2'):
     import xml.etree.ElementTree as ET
     from xml.dom import minidom
-    ns = 'http://www.esocial.gov.br/schema/evt/expRisco/v02_02_00'
-    ET.register_namespace('', ns)
-    root = ET.Element('eSocial', xmlns=ns)
-    evt = ET.SubElement(root, 'evtExpRisco')
-    ET.SubElement(evt, 'Id').text = f"ID{evento.id:08d}"
+    import re
 
+    ns = 'http://www.esocial.gov.br/schema/evento/evento-s2240/v1_0_0'
+    ET.register_namespace('', ns)
+
+    root = ET.Element('eSocial', xmlns=ns)
+
+    # ID correto como atributo
+    evt = ET.SubElement(root, 'evtExpRisco')
+    evt.set('Id', f"ID{empresa.cnpj}{evento.id:010d}")
+
+    # =========================
+    # ideEvento
+    # =========================
     ideEvento = ET.SubElement(evt, 'ideEvento')
     ET.SubElement(ideEvento, 'indRetif').text = '1'
-    ET.SubElement(ideEvento, 'nrRecibo').text = ''
     ET.SubElement(ideEvento, 'tpAmb').text = ambiente
     ET.SubElement(ideEvento, 'procEmi').text = '1'
-    ET.SubElement(ideEvento, 'verProc').text = '1.0.0'
+    ET.SubElement(ideEvento, 'verProc').text = '1.0'
 
+    # =========================
+    # ideEmpregador
+    # =========================
     ideEmpregador = ET.SubElement(evt, 'ideEmpregador')
     ET.SubElement(ideEmpregador, 'tpInsc').text = '1'
-    ET.SubElement(ideEmpregador, 'nrInsc').text = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
+    ET.SubElement(ideEmpregador, 'nrInsc').text = re.sub(r'\D', '', empresa.cnpj)
 
-    ideTrab = ET.SubElement(evt, 'ideTrabalhador')
-    ET.SubElement(ideTrab, 'cpfTrab').text = funcionario.cpf.replace('.', '').replace('-', '')
-    ET.SubElement(ideTrab, 'matricula').text = funcionario.matricula_esocial or ''
+    # =========================
+    # ideVinculo (CORRETO)
+    # =========================
+    ideVinculo = ET.SubElement(evt, 'ideVinculo')
+    ET.SubElement(ideVinculo, 'cpfTrab').text = re.sub(r'\D', '', funcionario.cpf)
 
+    matricula = funcionario.matricula_esocial
+    if not matricula:
+        raise ValueError("Funcionário sem matrícula")
+
+    ET.SubElement(ideVinculo, 'matricula').text = matricula
+
+    # =========================
+    # infoExpRisco
+    # =========================
     infoExpRisco = ET.SubElement(evt, 'infoExpRisco')
-    ET.SubElement(infoExpRisco, 'dtAvaliacao').text = evento.data_avaliacao.strftime('%Y-%m-%d')
-    ET.SubElement(infoExpRisco, 'cpfAval').text = evento.cpf_avaliador.replace('.', '').replace('-', '')
+    ET.SubElement(infoExpRisco, 'dtIniCondicao').text = evento.data_avaliacao.strftime('%Y-%m-%d')
 
-    # Riscos associados (se houver)
-    for risco in evento.riscos:  # ajuste conforme seu relacionamento
-        risco_elem = ET.SubElement(infoExpRisco, 'risco')
-        ET.SubElement(risco_elem, 'codAgNoc').text = risco.codigo_agente
-        ET.SubElement(risco_elem, 'intensid').text = risco.intensidade
-        ET.SubElement(risco_elem, 'epiEficaz').text = risco.epi_utilizado or ''
+    # Ambiente
+    infoAmb = ET.SubElement(infoExpRisco, 'infoAmb')
+    ET.SubElement(infoAmb, 'localAmb').text = '1'
 
-    xml_str = ET.tostring(root, encoding='unicode')
+    # Atividade
+    infoAtiv = ET.SubElement(infoExpRisco, 'infoAtiv')
+    ET.SubElement(infoAtiv, 'dscAtiv').text = 'Atividade não especificada'
+
+    # Riscos
+    if not evento.riscos:
+        ag = ET.SubElement(infoExpRisco, 'agNoc')
+        ET.SubElement(ag, 'codAgNocivo').text = '00.00.000'
+        ET.SubElement(ag, 'dscAgNocivo').text = 'Nenhum risco'
+        ET.SubElement(ag, 'tpAval').text = '2'
+    else:
+        for risco in evento.riscos:
+            ag = ET.SubElement(infoExpRisco, 'agNoc')
+            ET.SubElement(ag, 'codAgNocivo').text = risco.codigo_agente
+            ET.SubElement(ag, 'dscAgNocivo').text = risco.descricao
+            ET.SubElement(ag, 'tpAval').text = '2'
+
+    xml_str = ET.tostring(root, encoding='utf-8')
     dom = minidom.parseString(xml_str)
+
     return dom.toprettyxml(indent="  ")
 ################################################################# certificado #############################
 def carregar_certificado(pfx_path, senha):
@@ -2845,18 +2873,450 @@ def gerar_xml_s2221(evento, empresa, funcionario, ambiente='2'):
     xml_str = ET.tostring(root, encoding='unicode')
     dom = minidom.parseString(xml_str)
     return dom.toprettyxml(indent="  ")
+############################################################ view 2210.2221.2240 ################################
+
+@app.route('/view_xml_s2220/<int:id>')
+@login_required
+def view_xml_s2220(id):
+    from xml.etree import ElementTree as ET
+    from xml.dom import minidom
+    from datetime import date, datetime
+
+    evento = EventoS2220.query.get_or_404(id)
+    funcionario = evento.funcionario
+    empresa = funcionario.empresa
+
+    # Função auxiliar para converter para string XML
+    def to_xml_str(valor):
+        if valor is None:
+            return ''
+        if isinstance(valor, (date, datetime)):
+            return valor.strftime('%Y-%m-%d')
+        return str(valor)
+
+    # Dados da empresa
+    cnpj = empresa.cnpj if empresa and empresa.cnpj else '13568296000193'
+    tpInsc = '1'
+
+    # Dados do evento
+    tpAmb = '2'
+    procEmi = '1'
+    verProc = '1.0'
+    indRetif = '1'
+    id_evento = f"ID{cnpj}{evento.id:010d}"
+
+    # Dados do trabalhador
+    cpf_trab = funcionario.cpf.replace('.', '').replace('-', '') if funcionario.cpf else ''
+    matricula = getattr(funcionario, 'matricula_esocial', '') or ''
+
+    # Dados do ASO
+    dt_aso = to_xml_str(getattr(evento, 'data_aso', None))
+    if not dt_aso:
+        dt_aso = to_xml_str(date.today())
+
+    # Médico
+    crm_med = getattr(evento, 'crm_medico', '')
+    uf_crm = getattr(evento, 'uf_crm', '')
+
+    # Exames (lista de objetos relacionados)
+    exames = getattr(evento, 'exames', [])  # lista de instâncias de S2220Exame
+
+    # Criação do XML
+    root = ET.Element("eSocial")
+    root.set("xmlns", "http://www.esocial.gov.br/schema/evt/evtASO/v_S_01_00_00")
+
+    evt_aso = ET.SubElement(root, "evtASO")
+    evt_aso.set("Id", id_evento)
+
+    ideEvento = ET.SubElement(evt_aso, "ideEvento")
+    ET.SubElement(ideEvento, "indRetif").text = indRetif
+    ET.SubElement(ideEvento, "nrRecibo").text = ""
+    ET.SubElement(ideEvento, "tpAmb").text = tpAmb
+    ET.SubElement(ideEvento, "procEmi").text = procEmi
+    ET.SubElement(ideEvento, "verProc").text = verProc
+
+    ideEmpregador = ET.SubElement(evt_aso, "ideEmpregador")
+    ET.SubElement(ideEmpregador, "tpInsc").text = tpInsc
+    ET.SubElement(ideEmpregador, "nrInsc").text = cnpj
+
+    trabalhador = ET.SubElement(evt_aso, "trabalhador")
+    ET.SubElement(trabalhador, "cpfTrab").text = cpf_trab
+    if matricula:
+        ET.SubElement(trabalhador, "matricula").text = matricula
+
+    aso = ET.SubElement(evt_aso, "aso")
+    ET.SubElement(aso, "dtAso").text = dt_aso
+
+    medico = ET.SubElement(aso, "medico")
+    ET.SubElement(medico, "crmMed").text = crm_med
+    ET.SubElement(medico, "ufCrm").text = uf_crm
+
+    exames_node = ET.SubElement(aso, "exames")
+    if exames:
+        for exame in exames:
+            exame_node = ET.SubElement(exames_node, "exame")
+            # CORREÇÃO: acessar atributos do objeto, não usar .get()
+            dt_exame = to_xml_str(getattr(exame, 'data_exame', None))
+            tp_exame = str(getattr(exame, 'tipo_exame', '1'))
+            resultado = getattr(exame, 'resultado', 'NORMAL')
+            ET.SubElement(exame_node, "dtExame").text = dt_exame
+            ET.SubElement(exame_node, "tpExame").text = tp_exame
+            ET.SubElement(exame_node, "resultadoExame").text = resultado
+    else:
+        # Exemplo mínimo (se não houver exames cadastrados)
+        exame_node = ET.SubElement(exames_node, "exame")
+        ET.SubElement(exame_node, "dtExame").text = dt_aso
+        ET.SubElement(exame_node, "tpExame").text = "1"
+        ET.SubElement(exame_node, "resultadoExame").text = "NORMAL"
+
+    # Converte para string XML formatada
+    rough_string = ET.tostring(root, encoding='utf-8')
+    reparsed = minidom.parseString(rough_string)
+    xml_str = reparsed.toprettyxml(indent="  ")
+
+    response = make_response(xml_str)
+    response.headers['Content-Type'] = 'application/xml'
+    response.headers['Content-Disposition'] = f'inline; filename=s2220_{id}.xml'
+    return response
+@app.route('/view_xml_s2221/<int:id>')
+@login_required
+def view_xml_s2221(id):
+    from xml.etree import ElementTree as ET
+    from xml.dom import minidom
+    import re
+    from flask import make_response
+
+    evento = EventoS2221.query.get_or_404(id)
+    funcionario = evento.funcionario
+    empresa = funcionario.empresa
+
+    # 🔥 LIMPEZA DE DADOS (ESSENCIAL PARA ESOCIAL)
+    cnpj = re.sub(r'\D', '', empresa.cnpj or '13568296000193')
+    cpf_trab = re.sub(r'\D', '', funcionario.cpf or '')
+    cpf_resp = re.sub(r'\D', '', getattr(evento, 'cpf_responsavel', '') or '')
+
+    # Dados do evento
+    tpAmb = '2'
+    procEmi = '1'
+    verProc = '1.0'
+    indRetif = '1'
+
+    # 🔥 ID CORRETO (SEM MÁSCARA)
+    id_evento = f"ID{cnpj}{evento.id:010d}"
+
+    # Data exame
+    dt_exm = evento.data_exame.strftime('%Y-%m-%d') if evento.data_exame else ''
+
+    tp_exm_tox = str(getattr(evento, 'tp_exm_tox', '2'))
+    res_exm_tox = str(getattr(evento, 'res_exm_tox', '1'))
+    laboratorio = getattr(evento, 'laboratorio', 'xxxx')
+
+    matricula = getattr(funcionario, 'matricula_esocial', '') or ''
+
+    # XML
+    root = ET.Element("eSocial")
+    root.set("xmlns", "http://www.esocial.gov.br/schema/evento/evento-s2221/v1_0_0")
+
+    evt = ET.SubElement(root, "evtExmTox")
+    evt.set("Id", id_evento)
+
+    ideEvento = ET.SubElement(evt, "ideEvento")
+    ET.SubElement(ideEvento, "indRetif").text = indRetif
+    ET.SubElement(ideEvento, "tpAmb").text = tpAmb
+    ET.SubElement(ideEvento, "procEmi").text = procEmi
+    ET.SubElement(ideEvento, "verProc").text = verProc
+
+    ideEmpregador = ET.SubElement(evt, "ideEmpregador")
+    ET.SubElement(ideEmpregador, "tpInsc").text = '1'
+    ET.SubElement(ideEmpregador, "nrInsc").text = cnpj
+
+    ideVinculo = ET.SubElement(evt, "ideVinculo")
+    ET.SubElement(ideVinculo, "cpfTrab").text = cpf_trab
+
+    # ⚠️ matrícula obrigatória no eSocial
+    if matricula:
+        ET.SubElement(ideVinculo, "matricula").text = matricula
+
+    infoExmTox = ET.SubElement(evt, "infoExmTox")
+    ET.SubElement(infoExmTox, "dtExm").text = dt_exm
+    ET.SubElement(infoExmTox, "tpExmTox").text = tp_exm_tox
+    ET.SubElement(infoExmTox, "resExmTox").text = res_exm_tox
+    ET.SubElement(infoExmTox, "laboratorio").text = laboratorio
+    ET.SubElement(infoExmTox, "cpfResp").text = cpf_resp
+
+    # resposta
+    rough_string = ET.tostring(root, encoding='utf-8')
+    reparsed = minidom.parseString(rough_string)
+    xml_str = reparsed.toprettyxml(indent="  ")
+
+    response = make_response(xml_str)
+    response.headers['Content-Type'] = 'application/xml'
+    response.headers['Content-Disposition'] = f'inline; filename=s2221_{id}.xml'
+    return response
 
 @app.route('/s2210/view_xml/<int:id>')
 @login_required
 def view_xml_s2210(id):
+    from xml.etree import ElementTree as ET
+    from xml.dom import minidom
+    from datetime import date, time, datetime
+    import re
+
     evento = EventoS2210.query.get_or_404(id)
+
     if not evento.data_acidente:
         flash('Evento sem data de acidente, não é possível gerar XML', 'error')
         return redirect(url_for('list_s2210'))
+
     funcionario = evento.funcionario
     empresa = funcionario.empresa
-    xml_str = gerar_xml_s2210(evento, empresa, funcionario, '2')
-    return Response(xml_str, mimetype='application/xml')
+
+    # 🔥 LIMPEZA PADRÃO
+    def only_numbers(v):
+        return re.sub(r'\D', '', str(v)) if v else ''
+
+    def to_xml_str(valor):
+        if valor is None:
+            return ''
+        if isinstance(valor, (date, datetime)):
+            return valor.strftime('%Y-%m-%d')
+        if isinstance(valor, time):
+            return valor.strftime('%H:%M')
+        return str(valor)
+
+    # 🔥 EMPRESA
+    cnpj = only_numbers(empresa.cnpj) if empresa else '13568296000193'
+    tpInsc = '1'
+
+    # 🔥 EVENTO
+    tpAmb = '2'
+    procEmi = '1'
+    verProc = '1.0'
+    indRetif = '1'
+
+    id_evento = f"ID{cnpj}{evento.id:010d}"
+
+    # 🔥 TRABALHADOR
+    cpf_trab = only_numbers(funcionario.cpf)
+    matricula = getattr(funcionario, 'matricula_esocial', '') or ''
+
+    # 🔥 ACIDENTE
+    dt_acidente = to_xml_str(evento.data_acidente)
+    tp_acidente = to_xml_str(getattr(evento, 'tipo_acidente', '1'))
+    hr_acidente = to_xml_str(getattr(evento, 'hora_acidente', None))
+    dt_comunicacao = to_xml_str(getattr(evento, 'data_comunicacao', evento.data_acidente))
+
+    tp_cat = to_xml_str(getattr(evento, 'tp_cat', '1'))
+    ind_cat_obito = to_xml_str(getattr(evento, 'ind_cat_obito', '0'))
+    houve_afastamento = to_xml_str(getattr(evento, 'houve_afastamento', '1'))
+
+    # 🔥 XML
+    root = ET.Element("eSocial")
+    root.set("xmlns", "http://www.esocial.gov.br/schema/evento/evento-s2210/v1_0_0")
+
+    evt = ET.SubElement(root, "evtAcidTrab")
+    evt.set("Id", id_evento)
+
+    ideEvento = ET.SubElement(evt, "ideEvento")
+    ET.SubElement(ideEvento, "indRetif").text = indRetif
+    ET.SubElement(ideEvento, "tpAmb").text = tpAmb
+    ET.SubElement(ideEvento, "procEmi").text = procEmi
+    ET.SubElement(ideEvento, "verProc").text = verProc
+
+    ideEmpregador = ET.SubElement(evt, "ideEmpregador")
+    ET.SubElement(ideEmpregador, "tpInsc").text = tpInsc
+    ET.SubElement(ideEmpregador, "nrInsc").text = cnpj
+
+    ideVinculo = ET.SubElement(evt, "ideVinculo")
+    ET.SubElement(ideVinculo, "cpfTrab").text = cpf_trab
+
+    # 🔥 MATRÍCULA GARANTIDA (IMPORTANTE PARA eSOCIAL)
+    if matricula:
+        ET.SubElement(ideVinculo, "matricula").text = matricula
+    else:
+        ET.SubElement(ideVinculo, "matricula").text = f"MAT{funcionario.id:06d}"
+
+    infoAcid = ET.SubElement(evt, "infoAcid")
+    ET.SubElement(infoAcid, "dtAcid").text = dt_acidente
+    ET.SubElement(infoAcid, "tpAcid").text = tp_acidente
+
+    if hr_acidente:
+        ET.SubElement(infoAcid, "hrAcid").text = hr_acidente
+
+    infoCAT = ET.SubElement(infoAcid, "infoCAT")
+    ET.SubElement(infoCAT, "dtComunicacao").text = dt_comunicacao
+    ET.SubElement(infoCAT, "tpCat").text = tp_cat
+    ET.SubElement(infoCAT, "indCatObito").text = ind_cat_obito
+    ET.SubElement(infoCAT, "houveAfastamento").text = houve_afastamento
+
+    # 🔥 OUTPUT
+    rough_string = ET.tostring(root, encoding='utf-8')
+    reparsed = minidom.parseString(rough_string)
+    xml_str = reparsed.toprettyxml(indent="  ")
+
+    response = make_response(xml_str)
+    response.headers['Content-Type'] = 'application/xml'
+    response.headers['Content-Disposition'] = f'inline; filename=s2210_{id}.xml'
+
+    return response
+
+@app.route('/view_xml_s2240/<int:id>')
+@login_required
+def view_xml_s2240(id):
+    from xml.etree import ElementTree as ET
+    from xml.dom import minidom
+    import json
+    from datetime import datetime
+
+    evento = EventoS2240.query.get_or_404(id)
+    funcionario = evento.funcionario  # relacionamento com Funcionario
+
+    # ----- Dados da empresa (ajuste conforme seu cadastro) -----
+    cnpj_empresa = '12345678000199'   # substituir pelo CNPJ real da empresa
+    tpInsc = '1'                      # 1=CNPJ
+    nrInsc = cnpj_empresa
+
+    # ----- Dados do evento -----
+    tpAmb = '2'                       # 2=teste, 1=produção
+    procEmi = '1'                     # 1=app empregador
+    verProc = '1.0'                   # versão do processo
+    indRetif = '1'                    # 1=original
+    # Gera um Id único no padrão: ID + CNPJ + data + sequencial (aqui usamos o id do evento)
+    id_evento = f"ID{cnpj_empresa}{evento.id:010d}"
+
+    # ----- Dados do trabalhador (usando matricula_esocial) -----
+    cpf_trab = funcionario.cpf if funcionario and funcionario.cpf else '00000000000'
+    matricula = getattr(funcionario, 'matricula_esocial', '') or ''
+
+    # ----- Dados da avaliação -----
+    dt_ini_condicao = evento.data_avaliacao.strftime('%Y-%m-%d') if evento.data_avaliacao else datetime.now().strftime('%Y-%m-%d')
+    local_amb = getattr(evento, 'local_amb', '1')  # 1=interno, 2=externo
+    dsc_atividade = getattr(evento, 'descricao_atividade', '') or 'Atividade não especificada'
+
+    # ----- Tipo de avaliação (1=quantitativa, 2=qualitativa) -----
+    tp_aval = getattr(evento, 'tp_aval', '2')  # padrão qualitativo
+
+    # ----- Riscos (agentes nocivos) -----
+    riscos_codigos = []
+    if hasattr(evento, 'riscos_json') and evento.riscos_json:
+        try:
+            val = evento.riscos_json
+            if isinstance(val, str):
+                riscos_codigos = json.loads(val)
+            else:
+                riscos_codigos = val
+        except:
+            riscos_codigos = []
+    if not riscos_codigos:
+        riscos_codigos = ['00.00.000']   # nenhum risco
+
+    # ----- Criação do XML -----
+    root = ET.Element("eSocial")
+    root.set("xmlns", "http://www.esocial.gov.br/schema/evento/evento-s2240/v1_0_0")
+
+    evt_exp_risco = ET.SubElement(root, "evtExpRisco")
+    evt_exp_risco.set("Id", id_evento)
+
+    # ideEvento
+    ideEvento = ET.SubElement(evt_exp_risco, "ideEvento")
+    ET.SubElement(ideEvento, "indRetif").text = indRetif
+    ET.SubElement(ideEvento, "tpAmb").text = tpAmb
+    ET.SubElement(ideEvento, "procEmi").text = procEmi
+    ET.SubElement(ideEvento, "verProc").text = verProc
+
+    # ideEmpregador
+    ideEmpregador = ET.SubElement(evt_exp_risco, "ideEmpregador")
+    ET.SubElement(ideEmpregador, "tpInsc").text = tpInsc
+    ET.SubElement(ideEmpregador, "nrInsc").text = nrInsc
+
+    # ideVinculo
+    ideVinculo = ET.SubElement(evt_exp_risco, "ideVinculo")
+    ET.SubElement(ideVinculo, "cpfTrab").text = cpf_trab
+    if matricula:
+        ET.SubElement(ideVinculo, "matricula").text = matricula
+
+    # infoExpRisco
+    infoExpRisco = ET.SubElement(evt_exp_risco, "infoExpRisco")
+    ET.SubElement(infoExpRisco, "dtIniCondicao").text = dt_ini_condicao
+
+    # infoAmb (ambiente)
+    infoAmb = ET.SubElement(infoExpRisco, "infoAmb")
+    ET.SubElement(infoAmb, "localAmb").text = local_amb
+
+    # infoAtiv (atividade)
+    infoAtiv = ET.SubElement(infoExpRisco, "infoAtiv")
+    ET.SubElement(infoAtiv, "dscAtiv").text = dsc_atividade
+
+    # Para cada risco (agente nocivo)
+    for codigo in riscos_codigos:
+        descricao = next((r['descricao'] for r in RISCOS_OCUPACIONAIS if r['codigo'] == codigo), '')
+        agNoc = ET.SubElement(infoExpRisco, "agNoc")
+        ET.SubElement(agNoc, "codAgNocivo").text = codigo
+        ET.SubElement(agNoc, "dscAgNocivo").text = descricao
+        ET.SubElement(agNoc, "tpAval").text = tp_aval
+
+        # Se for avaliação quantitativa, inclui os campos adicionais
+        if tp_aval == '1':
+            # Buscar do evento os valores específicos para este risco (se houver)
+            # Exemplo: campos armazenados em dicionário ou colunas separadas
+            int_conc = getattr(evento, f'int_conc_{codigo}', '85')
+            lim_tol = getattr(evento, f'lim_tol_{codigo}', '85')
+            un_med = getattr(evento, f'un_med_{codigo}', '1')
+            tec_med = getattr(evento, f'tec_med_{codigo}', 'Dosimetria')
+            ET.SubElement(agNoc, "intConc").text = str(int_conc)
+            ET.SubElement(agNoc, "limTol").text = str(lim_tol)
+            ET.SubElement(agNoc, "unMed").text = str(un_med)
+            ET.SubElement(agNoc, "tecMedicao").text = tec_med
+
+    # Converte para string XML formatada
+    rough_string = ET.tostring(root, encoding='utf-8')
+    reparsed = minidom.parseString(rough_string)
+    xml_str = reparsed.toprettyxml(indent="  ")
+
+    response = make_response(xml_str)
+    response.headers['Content-Type'] = 'application/xml'
+    response.headers['Content-Disposition'] = f'inline; filename=s2240_{id}.xml'
+    return response
+@app.route('/s2240/update/<int:id>', methods=['POST'])
+@login_required
+def update_s2240(id):
+    evento = S2240Event.query.get_or_404(id)
+
+    # Atualiza os campos conforme os dados do formulário
+    # Exemplo: (ajuste os nomes dos campos de acordo com seu modelo)
+    evento.nr_insc = request.form.get('nr_insc')
+    evento.dt_ini_condicao = request.form.get('dt_ini_condicao')
+    evento.dt_fim_condicao = request.form.get('dt_fim_condicao')
+    # ... todos os outros campos do S-2240
+
+    try:
+        db.session.commit()
+        flash('Evento S-2240 atualizado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao atualizar: {str(e)}', 'danger')
+
+    return redirect(url_for('list_s2240'))
+
+
+@app.route('/processar_s2240_edit/<int:id>', methods=['POST'])
+@login_required
+def processar_s2240_edit(id):
+    evento = EventoS2240.query.get_or_404(id)
+
+    # Atualize os campos conforme os dados enviados pelo formulário
+    # Exemplo (ajuste os nomes dos campos de acordo com seu modelo):
+    evento.nr_insc = request.form.get('nr_insc')
+    evento.dt_ini_condicao = request.form.get('dt_ini_condicao')
+    evento.dt_fim_condicao = request.form.get('dt_fim_condicao')
+    # Adicione aqui todos os campos que podem ser editados
+
+    try:
+        db.session.commit()
+        return {'status': 'success', 'message': 'Evento atualizado com sucesso!'}
+    except Exception as e:
+        db.session.rollback()
+        return {'status': 'error', 'message': str(e)}, 500
 ##################################################### RECIBOS #################################
 @app.route('/recibos')
 @login_required
@@ -4047,15 +4507,11 @@ def responder_avaliacao(token):
     return render_template('questionario_psicossocial.html', avaliacao=avaliacao)
 
 
-@app.route('/avaliacao/resultado/<int:id>')
+@app.route('/ver_resultado/<int:id>')
 def ver_resultado(id):
-    avaliacao = db.session.get(AvaliacaoPsicossocial, id)
-    if not avaliacao:
-        flash('Avaliação não encontrada', 'danger')
-        return redirect(url_for('index'))
-
-    return render_template('resultado_avaliacao.html', avaliacao=avaliacao)
-
+    avaliacao = AvaliacaoPsicossocial.query.get_or_404(id)
+    # Buscar outros dados, se necessário
+    return render_template('ver_resultado.html', avaliacao=avaliacao)
 
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
@@ -4298,7 +4754,282 @@ def esqueci_senha():
         return render_template('senha_temporaria.html', senha=temp_password, username=user.username)
 
     return render_template('esqueci_senha.html')
-# ================= EXECUÇÃO =================
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+################################################# PGR #############################
 
+
+@app.route('/pgr/pdf')
+@login_required
+def gerar_pgr_pdf():
+    empresa = Empresa.query.first()
+    if not empresa:
+        flash('Nenhuma empresa cadastrada.', 'danger')
+        return redirect(url_for('index'))
+
+    # Coleta riscos dos eventos S-2240 (adapte conforme seus campos reais)
+    riscos = []
+    for ev in EventoS2240.query.all():
+        descricao = getattr(ev, 'descricao_risco', 'Risco não especificado')
+        setor = getattr(ev, 'setor', 'Geral')
+        nivel = getattr(ev, 'nivel_risco', 'Baixo')
+        riscos.append({'setor': setor, 'descricao': descricao, 'nivel': nivel})
+
+    # Coleta avaliações psicossociais e converte para dicionário seguro
+    psicossociais = []
+    for aval in AvaliacaoPsicossocial.query.all():
+        psicossociais.append({
+            'setor': getattr(aval, 'setor', 'Não informado'),
+            'data_avaliacao': getattr(aval, 'data_avaliacao', None) or getattr(aval, 'created_at', None),
+            'demanda': getattr(aval, 'demanda', 'Não informada'),
+            'autonomia': getattr(aval, 'autonomia', 'Não informada'),
+            'suporte': getattr(aval, 'suporte', 'Não informado'),
+            'recomendacoes': getattr(aval, 'recomendacoes', 'Não informadas')
+        })
+
+    total_riscos = len(riscos)
+    criticos_altos = sum(1 for r in riscos if r['nivel'] in ['Crítico', 'Alto'])
+    medios = sum(1 for r in riscos if r['nivel'] == 'Médio')
+    baixos = sum(1 for r in riscos if r['nivel'] == 'Baixo')
+    data_geracao = date.today()
+
+    html = render_template('pgr_relatorio.html',
+                           empresa=empresa,
+                           data_geracao=data_geracao,
+                           riscos=riscos,
+                           psicossociais=psicossociais,
+                           total_riscos=total_riscos,
+                           criticos_altos=criticos_altos,
+                           medios=medios,
+                           baixos=baixos)
+
+    pdf_buffer = io.BytesIO()
+    pisa.CreatePDF(html, dest=pdf_buffer)
+    pdf_buffer.seek(0)
+
+    response = make_response(pdf_buffer.read())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=PGR_{empresa.cnpj}.pdf'
+    return response
+
+import base64
+import io
+from collections import Counter, defaultdict
+from datetime import date, datetime
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+from flask import render_template, make_response, flash, redirect, url_for
+from xhtml2pdf import pisa
+from models import Empresa, EventoS2240, AvaliacaoPsicossocial, Funcionario
+from flask_login import login_required
+
+@app.route('/pgr/pdf/<int:empresa_id>')
+@login_required
+def gerar_pgr_pdf_empresa(empresa_id):
+    try:
+        empresa = Empresa.query.get_or_404(empresa_id)
+
+        # ---------- RISCOS OCUPACIONAIS ----------
+        eventos = []
+        try:
+            if hasattr(EventoS2240, 'empresa_id'):
+                eventos = EventoS2240.query.filter_by(empresa_id=empresa_id).all()
+            else:
+                eventos = EventoS2240.query.join(Funcionario).filter(Funcionario.empresa_id == empresa_id).all()
+        except Exception as e:
+            print(f"Erro ao buscar eventos: {e}")
+
+        riscos = []
+        for ev in eventos:
+            descricao = getattr(ev, 'descricao_risco', None) or getattr(ev, 'risco_descricao', 'Risco não cadastrado')
+            setor = getattr(ev, 'setor', 'Geral')
+            nivel = getattr(ev, 'nivel_risco', getattr(ev, 'nivel', 'Baixo'))
+            data = getattr(ev, 'data_avaliacao', None) or getattr(ev, 'created_at', None)
+            riscos.append({'setor': setor, 'descricao': descricao, 'nivel': nivel, 'data': data})
+
+        total = len(riscos)
+        criticos_altos = sum(1 for r in riscos if r['nivel'] in ['Crítico', 'Alto'])
+        medios = sum(1 for r in riscos if r['nivel'] == 'Médio')
+        baixos = sum(1 for r in riscos if r['nivel'] == 'Baixo')
+
+        # ---------- GRÁFICOS DE RISCOS ----------
+        pie_b64 = None
+        if total > 0:
+            try:
+                niveis = ['Crítico', 'Alto', 'Médio', 'Baixo']
+                contagem = [sum(1 for r in riscos if r['nivel'] == n) for n in niveis]
+                if any(contagem):
+                    fig, ax = plt.subplots(figsize=(5,4))
+                    ax.pie(contagem, labels=niveis, autopct='%1.1f%%', startangle=90, colors=['#c0392b','#e67e22','#f1c40f','#2ecc71'])
+                    ax.axis('equal')
+                    pie_b64 = _fig_to_base64(fig)
+                    plt.close(fig)
+            except Exception as e:
+                print(f"Erro no gráfico de pizza: {e}")
+
+        bar_b64 = None
+        if total > 0:
+            try:
+                setores = Counter(r['setor'] for r in riscos)
+                top = setores.most_common(6)
+                if top:
+                    fig, ax = plt.subplots(figsize=(6,4))
+                    ax.barh([s[0] for s in top], [s[1] for s in top], color='#3498db')
+                    ax.set_xlabel('Quantidade de riscos')
+                    ax.set_title('Riscos por setor')
+                    bar_b64 = _fig_to_base64(fig)
+                    plt.close(fig)
+            except Exception as e:
+                print(f"Erro no gráfico de barras: {e}")
+
+        # ---------- AVALIAÇÕES PSICOSSOCIAIS ----------
+        avaliacoes_db = []
+        try:
+            if hasattr(AvaliacaoPsicossocial, 'empresa_id'):
+                avaliacoes_db = AvaliacaoPsicossocial.query.filter_by(empresa_id=empresa_id).all()
+            else:
+                avaliacoes_db = AvaliacaoPsicossocial.query.all()
+        except Exception as e:
+            print(f"Erro ao buscar avaliações: {e}")
+
+        psicossociais = []
+        medias_dim = {'demanda': 0, 'autonomia': 0, 'suporte': 0, 'recompensa': 0}
+        dados_radar = []
+        evolucao = defaultdict(list)
+
+        for av in avaliacoes_db:
+            demanda = float(getattr(av, 'demanda', 0) or 0)
+            autonomia = float(getattr(av, 'autonomia', 0) or 0)
+            suporte = float(getattr(av, 'suporte', 0) or 0)
+            recompensa = float(getattr(av, 'recompensa', 0) or 0)
+            data_av = getattr(av, 'data_avaliacao', None) or getattr(av, 'created_at', None)
+            setor_av = getattr(av, 'setor', 'Geral')
+            psicossociais.append({
+                'setor': setor_av,
+                'data': data_av,
+                'demanda': demanda,
+                'autonomia': autonomia,
+                'suporte': suporte,
+                'recompensa': recompensa,
+                'recomendacoes': getattr(av, 'recomendacoes', '')
+            })
+            if demanda and autonomia and suporte and recompensa:
+                dados_radar.append([demanda, autonomia, suporte, recompensa])
+            if data_av:
+                evolucao[data_av.strftime('%Y-%m')].append({
+                    'demanda': demanda, 'autonomia': autonomia, 'suporte': suporte, 'recompensa': recompensa
+                })
+
+        if dados_radar:
+            medias_dim = {
+                'demanda': np.mean([d[0] for d in dados_radar]),
+                'autonomia': np.mean([d[1] for d in dados_radar]),
+                'suporte': np.mean([d[2] for d in dados_radar]),
+                'recompensa': np.mean([d[3] for d in dados_radar])
+            }
+
+        # Gráfico radar
+        radar_b64 = None
+        if dados_radar:
+            try:
+                dims = list(medias_dim.keys())
+                valores = list(medias_dim.values())
+                angles = np.linspace(0, 2*np.pi, len(dims), endpoint=False).tolist()
+                valores += valores[:1]
+                angles += angles[:1]
+                fig, ax = plt.subplots(figsize=(5,5), subplot_kw=dict(polar=True))
+                ax.fill(angles, valores, alpha=0.3, color='#3498db')
+                ax.plot(angles, valores, 'o-', linewidth=2, color='#2980b9')
+                ax.set_xticks(angles[:-1])
+                ax.set_xticklabels(dims)
+                ax.set_ylim(0,5)
+                ax.set_title('Perfil Psicossocial (médias)')
+                radar_b64 = _fig_to_base64(fig)
+                plt.close(fig)
+            except Exception as e:
+                print(f"Erro no gráfico radar: {e}")
+
+        # Gráfico evolução temporal
+        linha_b64 = None
+        if len(evolucao) >= 2:
+            try:
+                periodos = sorted(evolucao.keys())
+                medias_periodo = []
+                for p in periodos:
+                    vals = evolucao[p]
+                    medias_periodo.append({
+                        'demanda': np.mean([v['demanda'] for v in vals]),
+                        'autonomia': np.mean([v['autonomia'] for v in vals]),
+                        'suporte': np.mean([v['suporte'] for v in vals]),
+                        'recompensa': np.mean([v['recompensa'] for v in vals])
+                    })
+                fig, ax = plt.subplots(figsize=(8,4))
+                ax.plot(periodos, [m['demanda'] for m in medias_periodo], 'o-', label='Demanda')
+                ax.plot(periodos, [m['autonomia'] for m in medias_periodo], 's-', label='Autonomia')
+                ax.plot(periodos, [m['suporte'] for m in medias_periodo], '^-', label='Suporte')
+                ax.plot(periodos, [m['recompensa'] for m in medias_periodo], 'd-', label='Recompensa')
+                ax.set_xlabel('Período')
+                ax.set_ylabel('Média (1-5)')
+                ax.set_title('Evolução das Dimensões Psicossociais')
+                ax.legend()
+                plt.xticks(rotation=45, ha='right')
+                linha_b64 = _fig_to_base64(fig)
+                plt.close(fig)
+            except Exception as e:
+                print(f"Erro no gráfico de evolução: {e}")
+
+        # ---------- RENDERIZAÇÃO HTML ----------
+        # Verifique se o template existe. Se não, crie-o ou mude o nome.
+        try:
+            html = render_template(
+                'pgr_oficial.html',
+                empresa=empresa,
+                data_geracao=date.today(),
+                riscos=riscos,
+                total_riscos=total,
+                criticos_altos=criticos_altos,
+                medios=medios,
+                baixos=baixos,
+                pie_chart=pie_b64,
+                bar_chart=bar_b64,
+                radar_chart=radar_b64,
+                linha_chart=linha_b64,
+                psicossociais=psicossociais,
+                medias_globais=medias_dim
+            )
+        except Exception as e:
+            flash(f'Erro ao renderizar template: {str(e)}', 'danger')
+            return redirect(url_for('list_empresas'))
+
+        # ---------- CONVERSÃO PARA PDF ----------
+        pdf_buffer = io.BytesIO()
+        pisa.CreatePDF(html, dest=pdf_buffer)
+        pdf_buffer.seek(0)
+
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=PGR_{empresa.cnpj}.pdf'
+        return response
+
+    except Exception as e:
+        import traceback
+        error_msg = traceback.format_exc()
+        print(error_msg)
+        with open('pgr_errors.log', 'a') as f:
+            f.write(f"{date.today()} - {str(e)}\n")
+            f.write(error_msg)
+        flash(f'Erro ao gerar PDF: {str(e)}. Verifique o arquivo pgr_errors.log', 'danger')
+        # Use o nome correto da rota de listagem de empresas
+        try:
+            return redirect(url_for('list_empresas'))
+        except:
+            return redirect(url_for('empresa_list'))
+
+def _fig_to_base64(fig):
+    img = io.BytesIO()
+    fig.savefig(img, format='png', bbox_inches='tight')
+    img.seek(0)
+    return base64.b64encode(img.getvalue()).decode()
+# ================= EXECUÇÃO =================
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)

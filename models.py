@@ -255,3 +255,6 @@ class EPIEntrega(db.Model):
 
     funcionario = db.relationship('Funcionario', backref='epi_entregas')
 
+@property
+def matricula(self):
+    return self.matricula_esocial

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>PGR - {{ empresa.razao_social }}</title>
+    <style>
+        /* Reset e configurações globais */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 10pt;
+            line-height: 1.3;
+            margin: 2cm;
+            color: #1e293b;
+            background: white;
+        }
+        /* Bordas e espaçamento para cada seção */
+        .section {
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+        h1 {
+            font-size: 18pt;
+            text-align: center;
+            margin: 40px 0 20px;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+        h2 {
+            font-size: 14pt;
+            margin: 25px 0 12px;
+            padding-bottom: 4px;
+            border-bottom: 1.5px solid #334155;
+            color: #0f172a;
+            page-break-after: avoid;
+        }
+        h3 {
+            font-size: 12pt;
+            margin: 15px 0 8px;
+            color: #1e3a8a;
+            page-break-after: avoid;
+        }
+        p, li {
+            text-align: justify;
+            margin-bottom: 6px;
+        }
+        /* Capa */
+        .capa {
+            text-align: center;
+            margin-top: 100px;
+            page-break-after: always;
+            border: 1px solid #cbd5e1;
+            padding: 40px 20px;
+            background: #fefefe;
+        }
+        .capa h1 {
+            font-size: 22pt;
+            margin-top: 40px;
+            margin-bottom: 60px;
+        }
+        .capa .empresa {
+            font-size: 16pt;
+            margin: 40px 0 10px;
+            font-weight: bold;
+        }
+        .capa .cnpj {
+            font-size: 11pt;
+            margin-bottom: 20px;
+        }
+        .capa .data {
+            margin-top: 80px;
+            font-size: 11pt;
+        }
+        .confidencial {
+            text-align: right;
+            font-size: 8pt;
+            color: #b91c1c;
+            margin-bottom: 15px;
+            border-bottom: 0.5px solid #e2e8f0;
+            padding-bottom: 5px;
+        }
+        /* Tabelas */
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 9pt;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #94a3b8;
+            padding: 6px;
+            vertical-align: top;
+        }
+        .data-table th {
+            background-color: #f1f5f9;
+            font-weight: bold;
+            text-align: center;
+        }
+        /* Cards e estatísticas */
+        .grid-stats {
+            width: 100%;
+            margin: 12px 0;
+            border-collapse: collapse;
+        }
+        .grid-stats td {
+            border: 1px solid #cbd5e1;
+            padding: 8px;
+            text-align: center;
+            background-color: #f8fafc;
+            width: 25%;
+        }
+        .stat-number {
+            font-size: 20pt;
+            font-weight: bold;
+            color: #0f172a;
+        }
+        .stat-label {
+            font-size: 9pt;
+            color: #334155;
+        }
+        /* Badges de risco */
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 8pt;
+            font-weight: bold;
+        }
+        .badge-critico { background: #fee2e2; color: #991b1b; }
+        .badge-alto { background: #ffedd5; color: #9a3412; }
+        .badge-medio { background: #fef9c3; color: #854d0e; }
+        .badge-baixo { background: #dcfce7; color: #166534; }
+        /* Gráficos */
+        .chart-box {
+            text-align: center;
+            margin: 15px auto;
+            page-break-inside: avoid;
+            max-width: 300px;
+        }
+        .chart-box img {
+            max-width: 100%;
+            height: auto;
+            border: 0.5px solid #e2e8f0;
+            padding: 5px;
+            background: white;
+        }
+        .flex-charts {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin: 10px 0;
+        }
+        /* Caixas de informação */
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 8px 12px;
+            margin: 12px 0;
+            font-size: 9pt;
+        }
+        /* Rodapé */
+        .footer-doc {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 8pt;
+            border-top: 0.5px solid #cbd5e1;
+            padding-top: 8px;
+            color: #475569;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        /* Índice */
+        .indice {
+            margin: 20px 0;
+            page-break-after: avoid;
+        }
+        .indice ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .indice li {
+            margin: 4px 0;
+            font-size: 10pt;
+        }
+    </style>
+</head>
+<body>
+
+<div class="confidencial">Confidencial - Uso interno PGR - Conforme NR-01 v1.0</div>
+
+<!-- CAPA (Folha de rosto) -->
+<div class="capa">
+    <h1>PROGRAMA DE GERENCIAMENTO DE RISCOS</h1>
+    <div class="empresa">{{ empresa.razao_social }}</div>
+    <div class="cnpj">CNPJ: {{ empresa.cnpj }}</div>
+    <div class="data">{{ data_geracao.strftime('%d de %B de %Y') }}</div>
+    <div style="margin-top: 60px;">Versão: 1.0 - Conforme NR-01 (2024)</div>
+</div>
+
+<!-- ÍNDICE -->
+<div class="indice">
+    <h2>ÍNDICE</h2>
+    <ul>
+        <li>1. EMBASAMENTO LEGAL E NORMATIVO ..................................... 3</li>
+        <li>2. DADOS CADASTRAIS DA ORGANIZAÇÃO ................................... 5</li>
+        <li>3. SUMÁRIO EXECUTIVO ................................................. 6</li>
+        <li>4. ANÁLISE DE RISCOS OCUPACIONAIS .................................... 7</li>
+        <li>5. AVALIAÇÃO DE RISCOS PSICOSSOCIAIS (NR-1) .......................... 10</li>
+        <li>6. ANÁLISE ERGONÔMICA (NR-17) ....................................... 14</li>
+        <li>7. PLANO DE AÇÃO ..................................................... 16</li>
+        <li>8. RESPONSABILIDADES E CRONOGRAMA ................................... 18</li>
+        <li>9. CONSIDERAÇÕES FINAIS .............................................. 20</li>
+    </ul>
+</div>
+<div class="page-break"></div>
+
+<!-- 1. EMBASAMENTO LEGAL -->
+<h2>1. EMBASAMENTO LEGAL E NORMATIVO</h2>
+<p>O Programa de Gerenciamento de Riscos (PGR) fundamenta-se na Constituição Federal de 1988 (Art. 7º, XXII), na Consolidação das Leis do Trabalho (CLT, Arts. 154 a 201) e nas Normas Regulamentadoras do Ministério do Trabalho e Emprego.</p>
+<p>As principais NRs aplicáveis são:</p>
+<ul>
+    <li><strong>NR-1 (Disposições Gerais e Gerenciamento de Riscos Ocupacionais)</strong> – estabelece a obrigatoriedade do PGR, definindo a sistemática de identificação, avaliação e controle dos riscos, incluindo os psicossociais.</li>
+    <li><strong>NR-7 (PCMSO)</strong> – programa de controle médico de saúde ocupacional, integrado ao PGR.</li>
+    <li><strong>NR-9 (Avaliação e Controle de Exposição a Agentes Ambientais)</strong> – define critérios para riscos físicos, químicos e biológicos.</li>
+    <li><strong>NR-17 (Ergonomia)</strong> – adaptação das condições de trabalho às características psicofisiológicas dos trabalhadores.</li>
+</ul>
+<p>Esta versão do PGR atende à <strong>nova redação da NR-1 (2024)</strong>, que inclui os riscos psicossociais como parte integrante do inventário de riscos e exige medidas de prevenção e monitoramento contínuo.</p>
+<div class="page-break"></div>
+
+<!-- 2. DADOS CADASTRAIS -->
+<h2>2. DADOS CADASTRAIS DA ORGANIZAÇÃO</h2>
+<table class="data-table" style="width: 70%;">
+    <tr><th style="width: 30%;">Razão Social</th><td>{{ empresa.razao_social }}</td></tr>
+    <tr><th>CNPJ</th><td>{{ empresa.cnpj }}</td></tr>
+    <tr><th>Endereço</th><td>{{ empresa.endereco or 'Não informado' }}</td></tr>
+    <tr><th>Data de Elaboração</th><td>{{ data_geracao.strftime('%d/%m/%Y') }}</td></tr>
+</table>
+<div class="page-break"></div>
+
+<!-- 3. SUMÁRIO EXECUTIVO -->
+<h2>3. SUMÁRIO EXECUTIVO</h2>
+<p>O presente relatório consolida a gestão de riscos ocupacionais da empresa, com base nos dados registrados no sistema eSocial e nas avaliações realizadas.</p>
+<table class="grid-stats">
+    <tr>
+        <td><div class="stat-number">{{ total_riscos }}</div><div class="stat-label">Total de Riscos</div></td>
+        <td><div class="stat-number">{{ criticos_altos }}</div><div class="stat-label">Críticos/Altos</div></td>
+        <td><div class="stat-number">{{ medios }}</div><div class="stat-label">Médios</div></td>
+        <td><div class="stat-number">{{ baixos }}</div><div class="stat-label">Baixos</div></td>
+    </tr>
+</table>
+<p><strong>Principais achados:</strong></p>
+<ul>
+    <li>{{ criticos_altos }} riscos classificados como Críticos ou Altos (necessitam de ação imediata).</li>
+    <li>{{ medios }} riscos médios (monitoramento contínuo).</li>
+    <li>{{ baixos }} riscos baixos (manter controles existentes).</li>
+    <li>Foram realizadas {{ psicossociais|length }} avaliações psicossociais.</li>
+</ul>
+<div class="info-box">📌 Recomendação inicial: Priorizar a implementação de medidas de controle para os riscos críticos/altos, conforme plano de ação detalhado na seção 7.</div>
+<div class="page-break"></div>
+
+<!-- 4. ANÁLISE DE RISCOS OCUPACIONAIS -->
+<h2>4. ANÁLISE DE RISCOS OCUPACIONAIS</h2>
+<p>Os riscos ocupacionais foram identificados com base nos eventos S-2240 (Condições Ambientais) registrados no eSocial. A seguir, a distribuição estatística e o inventário detalhado.</p>
+
+{% if pie_chart or bar_chart %}
+<div class="flex-charts">
+    {% if pie_chart %}
+    <div class="chart-box">
+        <h3>Distribuição por Nível</h3>
+        <img src="data:image/png;base64,{{ pie_chart }}" alt="Gráfico Pizza">
+    </div>
+    {% endif %}
+    {% if bar_chart %}
+    <div class="chart-box">
+        <h3>Riscos por Setor</h3>
+        <img src="data:image/png;base64,{{ bar_chart }}" alt="Gráfico Barras">
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<h3>Inventário de Riscos</h3>
+<table class="data-table">
+    <thead>
+        <tr><th>Setor</th><th>Descrição do Risco</th><th>Nível</th></tr>
+    </thead>
+    <tbody>
+        {% for risco in riscos %}
+        <tr>
+            <td>{{ risco.setor }}</td>
+            <td>{{ risco.descricao }}</td>
+            <td><span class="badge-{{ risco.nivel|lower }}">{{ risco.nivel }}</span></td>
+        </tr>
+        {% else %}
+        <td><td colspan="3">Nenhum risco cadastrado para esta empresa.ERRO: 500 - Internal Server Exception</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+<div class="page-break"></div>
+
+<!-- 5. AVALIAÇÃO DE RISCOS PSICOSSOCIAIS -->
+<h2>5. AVALIAÇÃO DE RISCOS PSICOSSOCIAIS</h2>
+<div class="info-box">
+    <strong>Conforme a nova NR-1 (2024):</strong> Os riscos psicossociais são aqueles decorrentes da organização do trabalho, como jornadas excessivas, cobranças intensas, falta de autonomia, baixo suporte social e ausência de reconhecimento. Devem ser avaliados e gerenciados juntamente com os riscos tradicionais.
+</div>
+
+{% if psicossociais %}
+    {% if radar_chart or linha_chart %}
+    <div class="flex-charts">
+        {% if radar_chart %}
+        <div class="chart-box">
+            <h3>Perfil Psicossocial</h3>
+            <img src="data:image/png;base64,{{ radar_chart }}" alt="Radar">
+        </div>
+        {% endif %}
+        {% if linha_chart %}
+        <div class="chart-box">
+            <h3>Evolução Temporal</h3>
+            <img src="data:image/png;base64,{{ linha_chart }}" alt="Evolução" style="max-width: 100%;">
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <h3>Médias Globais</h3>
+    <table class="data-table" style="width: 60%;">
+        <thead><tr><th>Dimensão</th><th>Média (1-5)</th><th>Avaliação</th></tr></thead>
+        <tbody>
+            <tr><td>Demanda</td><td>{{ "%.1f"|format(medias_globais.demanda) }}</td><td>{% if medias_globais.demanda > 3.5 %}⚠️ Alta demanda{% else %}✅ Adequada{% endif %}</td></tr>
+            <tr><td>Autonomia</td><td>{{ "%.1f"|format(medias_globais.autonomia) }}</td><td>{% if medias_globais.autonomia < 2.5 %}⚠️ Baixa autonomia{% else %}✅ Adequada{% endif %}</td></tr>
+            <tr><td>Suporte social</td><td>{{ "%.1f"|format(medias_globais.suporte) }}</td><td>{% if medias_globais.suporte < 2.5 %}⚠️ Insuficiente{% else %}✅ Adequado{% endif %}</td></tr>
+            <tr><td>Recompensa</td><td>{{ "%.1f"|format(medias_globais.recompensa) }}</td><td>{% if medias_globais.recompensa < 2.5 %}⚠️ Baixo reconhecimento{% else %}✅ Adequada{% endif %}</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Detalhamento das Avaliações</h3>
+    {% for aval in psicossociais %}
+    <div style="margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+        <strong>Setor:</strong> {{ aval.setor }} &nbsp;|&nbsp; <strong>Data:</strong> {{ aval.data.strftime('%d/%m/%Y') if aval.data else '---' }}<br>
+        <strong>Demanda:</strong> {{ aval.demanda }} |
+        <strong>Autonomia:</strong> {{ aval.autonomia }} |
+        <strong>Suporte:</strong> {{ aval.suporte }} |
+        <strong>Recompensa:</strong> {{ aval.recompensa }}<br>
+        <em>Recomendações:</em> {{ aval.recomendacoes or 'Não informadas' }}
+    </div>
+    {% endfor %}
+{% else %}
+    <p>Nenhuma avaliação psicossocial registrada para esta empresa. Recomenda-se a realização imediata conforme determina a NR-1.</p>
+{% endif %}
+<div class="page-break"></div>
+
+<!-- 6. ANÁLISE ERGONÔMICA -->
+<h2>6. ANÁLISE ERGONÔMICA (NR-17)</h2>
+<p>A NR-17 estabelece parâmetros que visam adaptar as condições de trabalho às características psicofisiológicas dos trabalhadores. A análise ergonômica deve ser realizada sempre que houver queixas de desconforto ou riscos de LER/DORT.</p>
+<p>Com base nos dados disponíveis, identificam-se os seguintes pontos de atenção:</p>
+<ul>
+    <li><strong>Postos com movimentos repetitivos:</strong> (com base nos riscos cadastrados) – recomenda-se pausas ativas e rodízio de funções.</li>
+    <li><strong>Levantamento de peso:</strong> verificar se há limites adequados e uso de equipamentos de auxílio.</li>
+    <li><strong>Organização do trabalho:</strong> avaliar ritmo, metas e pausas para evitar fadiga mental.</li>
+</ul>
+<p>Recomenda-se a realização de uma <strong>Análise Ergonômica do Trabalho (AET)</strong> específica para os setores com maior concentração de riscos ergonômicos, com prazo de 90 dias.</p>
+<div class="info-box">
+    💡 Dica: Integre a AET ao PGR e registre as ações no plano de ação abaixo.
+</div>
+<div class="page-break"></div>
+
+<!-- 7. PLANO DE AÇÃO -->
+<h2>7. PLANO DE AÇÃO</h2>
+<p>Com base nos riscos identificados e nas avaliações psicossociais, estabelece-se o seguinte plano de ação:</p>
+<table class="data-table">
+    <thead>
+        <tr><th>Ação</th><th>Prazo</th><th>Responsável</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>Implementar controles de engenharia para riscos críticos/altos</td><td>30 dias</td><td>Engenharia de Segurança</td><td>Pendente</td></tr>
+        <tr><td>Treinamento sobre riscos psicossociais e gestão de estresse</td><td>45 dias</td><td>SST / RH</td><td>Pendente</td></tr>
+        <tr><td>Realizar Análise Ergonômica do Trabalho (AET) nos setores críticos</td><td>90 dias</td><td>Engenharia / Ergonomista</td><td>Pendente</td></tr>
+        <tr><td>Implantar pausas ativas e ginástica laboral</td><td>15 dias</td><td>Supervisão / CIPA</td><td>Pendente</td></tr>
+        <tr><td>Reavaliar periodicamente os riscos (a cada 6 meses)</td><td>Contínuo</td><td>Equipe SST</td><td>Em andamento</td></tr>
+    </tbody>
+</table>
+<div class="page-break"></div>
+
+<!-- 8. RESPONSABILIDADES E CRONOGRAMA -->
+<h2>8. RESPONSABILIDADES E CRONOGRAMA</h2>
+<h3>8.1 Quadro de Responsabilidades</h3>
+<table class="data-table">
+    <thead><tr><th>Nível</th><th>Responsabilidades</th></tr></thead>
+    <tbody>
+        <tr><td>Diretoria</td><td>Aprovar recursos, definir políticas, assegurar conformidade.</td></tr>
+        <tr><td>Gerência</td><td>Coordenar equipes, alocar recursos, monitorar indicadores.</td></tr>
+        <tr><td>Supervisão</td><td>Implementar medidas, treinar equipe, reportar ocorrências.</td></tr>
+        <tr><td>CIPA</td><td>Inspecionar áreas, sugerir melhorias, investigar acidentes.</td></tr>
+        <tr><td>Colaboradores</td><td>Seguir normas, usar EPIs, comunicar riscos.</td></tr>
+    </tbody>
+</table>
+<h3>8.2 Cronograma de Implantação</h3>
+<table class="data-table">
+    <thead><tr><th>Fase</th><th>Atividades</th><th>Prazo</th><th>Responsável</th></tr></thead>
+    <tbody>
+        <tr><td>Diagnóstico</td><td>Levantamento de riscos, análise inicial</td><td>15 dias</td><td>Equipe SST</td></tr>
+        <tr><td>Planejamento</td><td>Elaborar PGR, definir ações</td><td>30 dias</td><td>Gerência</td></tr>
+        <tr><td>Implantação</td><td>Executar ações, treinamentos</td><td>60 dias</td><td>Supervisão</td></tr>
+        <tr><td>Monitoramento</td><td>Acompanhamento, auditorias</td><td>Contínuo</td><td>CIPA</td></tr>
+        <tr><td>Revisão</td><td>Análise de resultados, atualização</td><td>Anual</td><td>Diretoria</td></tr>
+    </tbody>
+</table>
+<div class="page-break"></div>
+
+<!-- 9. CONSIDERAÇÕES FINAIS -->
+<h2>9. CONSIDERAÇÕES FINAIS</h2>
+<p>Este PGR representa o compromisso da organização com a segurança, saúde e bem-estar dos colaboradores, em conformidade com a legislação vigente e as melhores práticas de gestão de riscos.</p>
+<p>A alta direção se compromete a alocar recursos necessários, monitorar continuamente os indicadores e revisar o programa anualmente ou sempre que houver mudanças significativas.</p>
+<p>Para garantir a eficácia do PGR, recomenda-se:</p>
+<ul>
+    <li>Manter os registros por no mínimo 20 anos (NR-1, art. 1.7).</li>
+    <li>Realizar auditorias internas periódicas.</li>
+    <li>Promover a participação ativa da CIPA e dos trabalhadores.</li>
+    <li>Integrar o PGR com o PCMSO e o eSocial.</li>
+</ul>
+
+<div class="footer-doc">
+    <p>{{ empresa.razao_social }} - PGR conforme NR-01, NR-07, NR-09 e NR-17</p>
+    <p>Gerado em {{ data_geracao.strftime('%d/%m/%Y às %H:%M') }}</p>
+</div>
+
+</body>
+</html>
