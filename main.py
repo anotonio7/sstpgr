@@ -8,7 +8,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from functools import wraps
 from io import BytesIO
-
+from forms import S2220Form, S2220ExameForm   # adicione no topo
 # ================= IMPORTAÇÕES DE TERCEIROS =================
 from flask import Flask, flash, jsonify, make_response, redirect, render_template, request, Response, send_file, session, url_for
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user, current_user
@@ -959,42 +959,20 @@ def create_s2220():
     return render_template('eventos/s2220_create.html', funcionarios=funcionarios)
 
 
-@app.route('/s2220/edit/<int:id>', methods=['GET', 'POST'])
-@login_required
-def edit_s2220(id):
-    evento = EventoS2220.query.get_or_404(id)
-    funcionarios = Funcionario.query.all()
-    if request.method == 'POST':
-        evento.funcionario_id = request.form.get('funcionario_id')
-        evento.data_aso = datetime.strptime(request.form['data_aso'], '%Y-%m-%d').date()
-        evento.crm_medico = request.form['crm_medico']
-        evento.uf_crm = request.form['uf_crm']
-        evento.cpf_medico = request.form['cpf_medico']
-        if not validar_cpf(evento.cpf_medico):
-            flash('CPF do médico inválido', 'danger')
-            return redirect(url_for('edit_s2220', id=id))
-
-        for exame in evento.exames:
-            db.session.delete(exame)
-        db.session.flush()
-
-        datas = request.form.getlist('data_exame[]')
-        tipos = request.form.getlist('tipo_exame[]')
-        resultados = request.form.getlist('resultado[]')
-        for i in range(len(datas)):
-            if datas[i] and tipos[i] and resultados[i]:
-                novo_exame = S2220Exame(
-                    evento_id=evento.id,
-                    data_exame=datetime.strptime(datas[i], '%Y-%m-%d').date(),
-                    tipo_exame=tipos[i],
-                    resultado=resultados[i]
-                )
-                db.session.add(novo_exame)
+@app.route('/s2220/exame/editar/<int:id>', methods=['GET', 'POST'])
+def editar_exame_s2220(id):
+    exame = S2220Exame.query.get_or_404(id)
+    form = S2220ExameForm(obj=exame)
+    if form.validate_on_submit():
+        exame.data_exame = form.data_exame.data
+        exame.tipo_exame = form.tipo_exame.data
+        exame.resultado = form.resultado.data
+        exame.descricao_atividade = form.descricao_atividade.data
         db.session.commit()
-        flash('Evento S-2220 atualizado!', 'success')
-        return redirect(url_for('list_s2220'))
-
-    return render_template('eventos/s2220_edit.html', evento=evento, funcionarios=funcionarios)
+        flash('Exame atualizado!', 'success')
+        # Certifique-se de que a função 'listar_exames_s2220' existe ou use o nome correto
+        return redirect(url_for('listar_exames_s2220', evento_id=exame.evento_id))
+    return render_template('s2220_exame_form.html', form=form, exame=exame)
 
 
 @app.route('/s2220/delete/<int:id>')
@@ -1006,6 +984,59 @@ def delete_s2220(id):
     flash('Evento S-2220 excluído!', 'success')
     return redirect(url_for('list_s2220'))
 
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
+
+def gerar_xml_s2220(evento, empresa, funcionario, ambiente='2'):
+    print("GERANDO XML COM DESCRIÇÃO DA ATIVIDADE")  # depuração
+    ns = 'http://www.esocial.gov.br/schema/evt/exmMed/v02_02_00'
+    ET.register_namespace('', ns)
+
+    root = ET.Element('eSocial', xmlns=ns)
+    evento_elem = ET.SubElement(root, 'evtExmMed')
+    ET.SubElement(evento_elem, 'Id').text = f"ID{evento.id:08d}"
+
+    ide_evento = ET.SubElement(evento_elem, 'ideEvento')
+    ET.SubElement(ide_evento, 'indRetif').text = '1'
+    ET.SubElement(ide_evento, 'nrRecibo').text = ''
+    ET.SubElement(ide_evento, 'tpAmb').text = ambiente
+    ET.SubElement(ide_evento, 'procEmi').text = '1'
+    ET.SubElement(ide_evento, 'verProc').text = '1.0.0'
+
+    ide_empregador = ET.SubElement(evento_elem, 'ideEmpregador')
+    ET.SubElement(ide_empregador, 'tpInsc').text = '1'
+    ET.SubElement(ide_empregador, 'nrInsc').text = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
+
+    ide_trab = ET.SubElement(evento_elem, 'ideTrabalhador')
+    ET.SubElement(ide_trab, 'cpfTrab').text = funcionario.cpf.replace('.', '').replace('-', '')
+    ET.SubElement(ide_trab, 'matricula').text = funcionario.matricula_esocial or ''
+
+    info_exame = ET.SubElement(evento_elem, 'infoExame')
+    ET.SubElement(info_exame, 'dtExmMed').text = evento.data_aso.strftime('%Y-%m-%d')
+    ET.SubElement(info_exame, 'tpExameOcup').text = '1'
+    ET.SubElement(info_exame, 'indResultado').text = '1'
+
+    medico = ET.SubElement(info_exame, 'medico')
+    ET.SubElement(medico, 'cpfMedico').text = (evento.cpf_medico or '').replace('.', '').replace('-', '')
+    ET.SubElement(medico, 'nisMedico').text = ''
+    ET.SubElement(medico, 'nmMedico').text = 'MÉDICO RESPONSÁVEL'
+    ET.SubElement(medico, 'nrCRM').text = evento.crm_medico
+    ET.SubElement(medico, 'ufCRM').text = evento.uf_crm
+
+    for exame in evento.exames:
+        exame_elem = ET.SubElement(info_exame, 'exame')
+        ET.SubElement(exame_elem, 'dtExm').text = exame.data_exame.strftime('%Y-%m-%d')
+        ET.SubElement(exame_elem, 'tpExm').text = exame.tipo_exame
+        # Adiciona descrição dentro do resultado (para aparecer no XML)
+        resultado_texto = exame.resultado or ''
+        if exame.descricao_atividade:
+            resultado_texto += f"\nDescrição da atividade: {exame.descricao_atividade}"
+        ET.SubElement(exame_elem, 'resExm').text = resultado_texto
+        print(f"Exame {exame.id}: descrição adicionada ao resultado")
+
+    xml_str = ET.tostring(root, encoding='unicode')
+    dom = minidom.parseString(xml_str)
+    return dom.toprettyxml(indent="  ")
 
 @app.route('/s2220/download_xml/<int:id>')
 @login_required
@@ -1020,6 +1051,7 @@ def download_xml_s2220(id):
     except Exception as e:
         flash(f'Erro ao gerar XML: {str(e)}', 'error')
         return redirect(url_for('list_s2220'))
+
 @app.route('/s2220/view_xml/<int:id>')
 @login_required
 def view_xml_s2220(id):
@@ -1111,6 +1143,19 @@ def teste_xml_s2220(id):
         <pre>{str(e)}</pre>
         <pre>{traceback.format_exc()}</pre>
         """
+@app.route('/s2220/edit/<int:id>', methods=['GET', 'POST'])
+def edit_s2220(id):
+    evento = EventoS2220.query.get_or_404(id)
+    form = S2220Form(obj=evento)  # Supondo que você tenha um formulário S2220Form
+    if form.validate_on_submit():
+        evento.data_avaliacao = form.data_avaliacao.data
+        evento.cpf_avaliador = form.cpf_avaliador.data
+        evento.nenhum_risco = form.nenhum_risco.data
+        # ... outros campos do evento S-2220 (não os exames)
+        db.session.commit()
+        flash('Evento S-2220 atualizado com sucesso!', 'success')
+        return redirect(url_for('list_s2220'))
+    return render_template('eventos/s2220_form.html', form=form, evento=evento)
 ########################################################## GERAR PDF PARA O ASO #############################
 @app.route('/s2220/download_pdf/<int:id>')
 @login_required
@@ -1137,293 +1182,224 @@ def download_pdf_s2220(id):
 
 
 def gerar_pdf_s2220(evento):
-    """Gera PDF do ASO (S-2220) - Com assinatura do funcionário"""
+    """Gera PDF do ASO (S-2220) com descrição da atividade"""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import cm
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
     from io import BytesIO
     from datetime import datetime
 
     buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=2*cm, bottomMargin=2*cm,
+                            leftMargin=2*cm, rightMargin=2*cm)
 
-    # Configuração da página
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        topMargin=2 * cm,
-        bottomMargin=2 * cm,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm
-    )
-
-    # Função para desenhar bordas pretas
     def bordas_pretas(canvas, doc):
         canvas.saveState()
         canvas.setStrokeColor(colors.black)
         canvas.setLineWidth(1.5)
-        canvas.rect(
-            1.2 * cm, 1.2 * cm,
-            A4[0] - 2.4 * cm,
-            A4[1] - 2.4 * cm,
-        )
+        canvas.rect(1.2*cm, 1.2*cm, A4[0]-2.4*cm, A4[1]-2.4*cm)
         canvas.restoreState()
 
     styles = getSampleStyleSheet()
-
-    # Estilos profissionais
-    estilo_titulo_principal = ParagraphStyle(
-        'TituloPrincipal',
-        parent=styles['Title'],
-        fontSize=13,
-        alignment=TA_CENTER,
-        spaceAfter=4,
-        spaceBefore=2,
-        textColor=colors.black,
-        fontName='Helvetica-Bold'
-    )
-
-    estilo_subtitulo = ParagraphStyle(
-        'Subtitulo',
-        parent=styles['Normal'],
-        fontSize=10,
-        alignment=TA_CENTER,
-        spaceAfter=8,
-        textColor=colors.black,
-        fontName='Helvetica'
-    )
-
-    estilo_secao = ParagraphStyle(
-        'Secao',
-        parent=styles['Normal'],
-        fontSize=10,
-        alignment=TA_LEFT,
-        spaceAfter=5,
-        spaceBefore=5,
-        textColor=colors.black,
-        fontName='Helvetica-Bold'
-    )
-
-    estilo_campo = ParagraphStyle(
-        'Campo',
-        parent=styles['Normal'],
-        fontSize=9,
-        alignment=TA_LEFT,
-        textColor=colors.black,
-        fontName='Helvetica-Bold'
-    )
-
-    estilo_valor = ParagraphStyle(
-        'Valor',
-        parent=styles['Normal'],
-        fontSize=9,
-        alignment=TA_LEFT,
-        textColor=colors.black,
-        fontName='Helvetica'
-    )
+    estilo_titulo = ParagraphStyle('Titulo', parent=styles['Title'], fontSize=13, alignment=TA_CENTER, fontName='Helvetica-Bold')
+    estilo_sub = ParagraphStyle('Subtitulo', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER)
+    estilo_secao = ParagraphStyle('Secao', parent=styles['Normal'], fontSize=10, alignment=TA_LEFT, fontName='Helvetica-Bold', spaceAfter=5)
+    estilo_campo = ParagraphStyle('Campo', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
+    estilo_valor = ParagraphStyle('Valor', parent=styles['Normal'], fontSize=9)
 
     story = []
-
     func = evento.funcionario
     empresa = func.empresa
 
-    # Função formatar data
     def formatar_data(valor):
-        if not valor:
-            return ""
-        if hasattr(valor, 'strftime'):
-            return valor.strftime('%d/%m/%Y')
-        if isinstance(valor, str):
-            for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%Y%m%d']:
-                try:
-                    data_obj = datetime.strptime(valor, fmt)
-                    return data_obj.strftime('%d/%m/%Y')
-                except:
-                    continue
-            return valor
+        if not valor: return ""
+        if hasattr(valor, 'strftime'): return valor.strftime('%d/%m/%Y')
         return str(valor)
 
-    # ================= CABEÇALHO =================
-    story.append(Paragraph("MINISTÉRIO DO TRABALHO E EMPREGO", estilo_titulo_principal))
-    story.append(Paragraph("Programa de Controle Médico de Saúde Ocupacional", estilo_subtitulo))
-    story.append(Paragraph("ATESTADO DE SAÚDE OCUPACIONAL - ASO", estilo_titulo_principal))
-    story.append(Spacer(1, 0.3 * cm))
+    story.append(Paragraph("MINISTÉRIO DO TRABALHO E EMPREGO", estilo_titulo))
+    story.append(Paragraph("Programa de Controle Médico de Saúde Ocupacional", estilo_sub))
+    story.append(Paragraph("ATESTADO DE SAÚDE OCUPACIONAL - ASO", estilo_titulo))
+    story.append(Spacer(1, 0.3*cm))
 
-    # ================= 1. IDENTIFICAÇÃO DA EMPRESA =================
+    # Empresa
     story.append(Paragraph("1. IDENTIFICAÇÃO DA EMPRESA", estilo_secao))
-
     dados_empresa = [
         [Paragraph("<b>Razão Social:</b>", estilo_campo), Paragraph(empresa.nome or "", estilo_valor)],
         [Paragraph("<b>CNPJ:</b>", estilo_campo), Paragraph(empresa.cnpj or "", estilo_valor)],
-        [Paragraph("<b>Endereço:</b>", estilo_campo),
-         Paragraph(f"{empresa.rua or ''}, {empresa.bairro or ''} - {empresa.cidade or ''}/{empresa.estado or ''}",
-                   estilo_valor)],
+        [Paragraph("<b>Endereço:</b>", estilo_campo), Paragraph(f"{empresa.rua or ''}, {empresa.bairro or ''} - {empresa.cidade or ''}/{empresa.estado or ''}", estilo_valor)],
     ]
+    t_emp = Table(dados_empresa, colWidths=[3.2*cm, 11.3*cm])
+    t_emp.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP')]))
+    story.append(t_emp)
+    story.append(Spacer(1, 0.2*cm))
 
-    tabela_empresa = Table(dados_empresa, colWidths=[3.2 * cm, 11.3 * cm])
-    tabela_empresa.setStyle(TableStyle([
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    story.append(tabela_empresa)
-    story.append(Spacer(1, 0.2 * cm))
-
-    # ================= 2. DADOS DO TRABALHADOR =================
+    # Funcionário
     story.append(Paragraph("2. DADOS DO TRABALHADOR", estilo_secao))
-
-    nascimento_str = formatar_data(func.nascimento)
-    admissao_str = formatar_data(func.admissao)
-
-    dados_trabalhador = [
+    dados_func = [
         [Paragraph("<b>Nome:</b>", estilo_campo), Paragraph(func.nome or "", estilo_valor),
          Paragraph("<b>CPF:</b>", estilo_campo), Paragraph(func.cpf or "", estilo_valor)],
-        [Paragraph("<b>Matrícula eSocial:</b>", estilo_campo),
-         Paragraph(func.matricula_esocial or "NÃO INFORMADA", estilo_valor),
-         Paragraph("<b>Nascimento:</b>", estilo_campo), Paragraph(nascimento_str, estilo_valor)],
-        [Paragraph("<b>Admissão:</b>", estilo_campo), Paragraph(admissao_str, estilo_valor),
-         Paragraph("<b>CBO:</b>", estilo_campo), Paragraph(func.cbo or "", estilo_valor)],
+        [Paragraph("<b>Nascimento:</b>", estilo_campo), Paragraph(formatar_data(func.nascimento), estilo_valor),
+         Paragraph("<b>Admissão:</b>", estilo_campo), Paragraph(formatar_data(func.admissao), estilo_valor)],
         [Paragraph("<b>Função:</b>", estilo_campo), Paragraph(func.funcao or "", estilo_valor),
-         Paragraph("", estilo_campo), Paragraph("", estilo_valor)],
+         Paragraph("<b>CBO:</b>", estilo_campo), Paragraph(func.cbo or "", estilo_valor)],
     ]
+    t_func = Table(dados_func, colWidths=[3*cm, 3.8*cm, 2.5*cm, 5.2*cm])
+    t_func.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP')]))
+    story.append(t_func)
+    story.append(Spacer(1, 0.2*cm))
 
-    tabela_trabalhador = Table(dados_trabalhador, colWidths=[3 * cm, 3.8 * cm, 2.5 * cm, 5.2 * cm])
-    tabela_trabalhador.setStyle(TableStyle([
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    story.append(tabela_trabalhador)
-    story.append(Spacer(1, 0.2 * cm))
-
-    # ================= 3. INFORMAÇÕES DO ASO =================
+    # ASO
     story.append(Paragraph("3. INFORMAÇÕES DO ASO", estilo_secao))
-
-    data_aso_str = formatar_data(evento.data_aso)
-
     dados_aso = [
-        [Paragraph("<b>Data do ASO:</b>", estilo_campo), Paragraph(data_aso_str, estilo_valor),
-         Paragraph("<b>CRM Médico:</b>", estilo_campo),
-         Paragraph(f"{evento.crm_medico}/{evento.uf_crm}" if evento.crm_medico else "", estilo_valor)],
-        [Paragraph("<b>CPF do Médico:</b>", estilo_campo),
-         Paragraph(evento.cpf_medico or "Não informado", estilo_valor),
-         Paragraph("", estilo_campo), Paragraph("", estilo_valor)],
+        [Paragraph("<b>Data do ASO:</b>", estilo_campo), Paragraph(formatar_data(evento.data_aso), estilo_valor),
+         Paragraph("<b>CRM Médico:</b>", estilo_campo), Paragraph(f"{evento.crm_medico}/{evento.uf_crm}" if evento.crm_medico else "", estilo_valor)],
+        [Paragraph("<b>CPF do Médico:</b>", estilo_campo), Paragraph(evento.cpf_medico or "", estilo_valor), "", ""],
     ]
+    t_aso = Table(dados_aso, colWidths=[3*cm, 3.8*cm, 2.5*cm, 5.2*cm])
+    t_aso.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP')]))
+    story.append(t_aso)
+    story.append(Spacer(1, 0.2*cm))
 
-    tabela_aso = Table(dados_aso, colWidths=[3 * cm, 3.8 * cm, 2.5 * cm, 5.2 * cm])
-    tabela_aso.setStyle(TableStyle([
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    story.append(tabela_aso)
-    story.append(Spacer(1, 0.2 * cm))
-
-    # ================= 4. EXAMES REALIZADOS =================
-    if evento.exames and len(evento.exames) > 0:
+    # EXAMES – COM DESCRIÇÃO DA ATIVIDADE
+    if evento.exames:
         story.append(Paragraph("4. EXAMES REALIZADOS", estilo_secao))
-
-        dados_exames = [["DATA", "TIPO DE EXAME", "RESULTADO"]]
-
-        for exame in evento.exames[:4]:
+        # Cabeçalho com 4 colunas
+        dados_exames = [["DATA", "TIPO DE EXAME", "RESULTADO", "DESCRIÇÃO DA ATIVIDADE"]]
+        for exame in evento.exames:
             dados_exames.append([
                 formatar_data(exame.data_exame),
                 exame.tipo_exame or '',
-                (exame.resultado[:35] + '...') if len(exame.resultado or '') > 35 else (exame.resultado or '')
+                (exame.resultado[:40] + '...') if len(exame.resultado or '') > 40 else (exame.resultado or ''),
+                (exame.descricao_atividade[:40] + '...') if len(exame.descricao_atividade or '') > 40 else (exame.descricao_atividade or '---')
             ])
-
-        tabela_exames = Table(dados_exames, colWidths=[2.2 * cm, 5 * cm, 7.3 * cm])
-        tabela_exames.setStyle(TableStyle([
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-            ('ALIGN', (2, 0), (2, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('FONTSIZE', (0, 1), (-1, -1), 8.5),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8e8e8')),
-            ('GRID', (0, 1), (-1, -1), 0.3, colors.lightgrey),
+        # Ajuste de larguras (pode adaptar)
+        t_exames = Table(dados_exames, colWidths=[2.2*cm, 4*cm, 4.5*cm, 4*cm])
+        t_exames.setStyle(TableStyle([
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e8e8e8')),
+            ('GRID', (0,1), (-1,-1), 0.3, colors.lightgrey),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('ALIGN', (0,0), (0,-1), 'CENTER'),
         ]))
-        story.append(tabela_exames)
-        story.append(Spacer(1, 0.2 * cm))
+        story.append(t_exames)
+        story.append(Spacer(1, 0.2*cm))
 
-    # ================= 5. CONCLUSÃO =================
+    # Conclusão
     story.append(Paragraph("5. CONCLUSÃO", estilo_secao))
-    story.append(Paragraph(
-        "O trabalhador acima identificado foi submetido aos exames constantes neste ASO, "
-        "encontrando-se APTO para o exercício de suas funções, conforme NR-07.",
-        estilo_valor
-    ))
-    story.append(Spacer(1, 0.4 * cm))
+    story.append(Paragraph("O trabalhador acima identificado foi submetido aos exames constantes neste ASO, encontrando-se APTO para o exercício de suas funções, conforme NR-07.", estilo_valor))
+    story.append(Spacer(1, 0.4*cm))
 
-    # ================= ASSINATURAS (2 colunas) =================
+    # Assinaturas
     story.append(Paragraph("6. ASSINATURAS", estilo_secao))
-    story.append(Spacer(1, 0.2 * cm))
-
-    # Tabela com duas colunas de assinatura
-    dados_assinaturas = [
-        [
-            Paragraph("<b>FUNCIONÁRIO</b>", estilo_campo),
-            Paragraph("<b>MÉDICO RESPONSÁVEL</b>", estilo_campo)
-        ],
-        [
-            Paragraph("_" * 35, estilo_valor),
-            Paragraph("_" * 35, estilo_valor)
-        ],
-        [
-            Paragraph(f"{func.nome or '_________________'}", estilo_valor),
-            Paragraph(f"{evento.crm_medico}/{evento.uf_crm}" if evento.crm_medico else "CRM: _________________",
-                      estilo_valor)
-        ],
-        [
-            Paragraph("Assinatura do Funcionário", estilo_valor),
-            Paragraph("Assinatura do Médico", estilo_valor)
-        ],
-        [
-            Paragraph(f"Data: {formatar_data(datetime.now())}", estilo_valor),
-            Paragraph(f"Data: {formatar_data(datetime.now())}", estilo_valor)
-        ],
+    dados_ass = [
+        [Paragraph("<b>FUNCIONÁRIO</b>", estilo_campo), Paragraph("<b>MÉDICO RESPONSÁVEL</b>", estilo_campo)],
+        [Paragraph("_"*35, estilo_valor), Paragraph("_"*35, estilo_valor)],
+        [Paragraph(func.nome or "_________________", estilo_valor), Paragraph(f"{evento.crm_medico}/{evento.uf_crm}" if evento.crm_medico else "CRM: ________", estilo_valor)],
+        [Paragraph("Assinatura do Funcionário", estilo_valor), Paragraph("Assinatura do Médico", estilo_valor)],
+        [Paragraph(f"Data: {formatar_data(datetime.now())}", estilo_valor), Paragraph(f"Data: {formatar_data(datetime.now())}", estilo_valor)],
     ]
-
-    tabela_assinaturas = Table(dados_assinaturas, colWidths=[7 * cm, 7 * cm])
-    tabela_assinaturas.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8e8e8')),
+    t_ass = Table(dados_ass, colWidths=[7*cm, 7*cm])
+    t_ass.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('BOX', (0,0), (-1,-1), 0.5, colors.black),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e8e8e8')),
     ]))
-    story.append(tabela_assinaturas)
-
-    story.append(Spacer(1, 0.3 * cm))
-
-    # ================= RODAPÉ =================
+    story.append(t_ass)
+    story.append(Spacer(1, 0.3*cm))
     story.append(Paragraph("<hr color='black' size='0.5'/>", styles['Normal']))
-    rodape = Paragraph(
-        "<font size=7>Documento eletrônico gerado conforme leiaute do eSocial (S-2220)</font>",
-        estilo_valor
-    )
-    story.append(rodape)
+    story.append(Paragraph("<font size=7>Documento eletrônico gerado conforme leiaute do eSocial (S-2220)</font>", estilo_valor))
 
-    # Gerar PDF
     doc.build(story, onFirstPage=bordas_pretas, onLaterPages=bordas_pretas)
     buffer.seek(0)
     return buffer
+@app.route('/s2220/evento/<int:evento_id>/exame/novo', methods=['GET', 'POST'])
+def criar_exame_s2220(evento_id):
+    evento = EventoS2220.query.get_or_404(evento_id)
+    form = S2220ExameForm()
+    if form.validate_on_submit():
+        exame = S2220Exame(
+            evento_id=evento.id,
+            data_exame=form.data_exame.data,
+            tipo_exame=form.tipo_exame.data,
+            resultado=form.resultado.data,
+            descricao_atividade=form.descricao_atividade.data   # ← NOVO
+        )
+        db.session.add(exame)
+        db.session.commit()
+        flash('Exame adicionado com sucesso!', 'success')
+        return redirect(url_for('listar_exames_s2220', evento_id=evento.id))
+    return render_template('s2220_exame_form.html', form=form, evento=evento)
+@app.route('/processar_s2220', methods=['POST'])
+@login_required
+def processar_s2220():
+    try:
+        funcionario_id = request.form.get('funcionario_id')
+        if not funcionario_id:
+            flash('Funcionário não selecionado', 'error')
+            return redirect(url_for('create_s2220'))
 
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            flash('Funcionário não encontrado', 'error')
+            return redirect(url_for('create_s2220'))
+
+        # Validação de matrícula e CBO (se necessário)
+        if not funcionario.matricula_esocial or not funcionario.cbo:
+            flash('Funcionário não possui Matrícula eSocial ou CBO. Edite o cadastro do funcionário.', 'error')
+            return redirect(url_for('create_s2220'))
+
+        # Dados do ASO
+        data_aso = datetime.strptime(request.form.get('data_aso'), '%Y-%m-%d').date()
+        crm_medico = request.form.get('crm_medico')
+        uf_crm = request.form.get('uf_crm').upper()
+        cpf_medico = request.form.get('cpf_medico') or None
+
+        # Criar evento S-2220
+        evento = EventoS2220(
+            funcionario_id=funcionario.id,
+            data_aso=data_aso,
+            crm_medico=crm_medico,
+            uf_crm=uf_crm,
+            cpf_medico=cpf_medico
+        )
+        db.session.add(evento)
+        db.session.flush()  # para obter o ID do evento
+
+        # Capturar listas dos exames
+        datas_exame = request.form.getlist('data_exame[]')
+        tipos_exame = request.form.getlist('tipo_exame[]')
+        resultados = request.form.getlist('resultado[]')
+        descricoes_atividade = request.form.getlist('descricao_atividade[]')  # <-- NOVO
+
+        for i in range(len(datas_exame)):
+            exame = S2220Exame(
+                evento_id=evento.id,
+                data_exame=datetime.strptime(datas_exame[i], '%Y-%m-%d').date(),
+                tipo_exame=tipos_exame[i],
+                resultado=resultados[i],
+                descricao_atividade=descricoes_atividade[i] if i < len(descricoes_atividade) and descricoes_atividade[i] else None
+            )
+            db.session.add(exame)
+
+        db.session.commit()
+
+        # Se o usuário solicitou apenas gerar XML (sem salvar? já salvou)
+        if request.form.get('apenas_xml'):
+            # Gera e retorna o XML
+            from xml_utils import gerar_xml_s2220  # ou a função que você tem
+            xml_str = gerar_xml_s2220(evento, funcionario.empresa, funcionario, ambiente='2')
+            return Response(xml_str, mimetype='application/xml', headers={'Content-Disposition': f'attachment; filename=s2220_{evento.id}.xml'})
+        else:
+            flash('Evento S-2220 salvo com sucesso!', 'success')
+            return redirect(url_for('list_s2220'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao processar: {str(e)}', 'error')
+        return redirect(url_for('create_s2220'))
 # ================= ROTAS S-2221 =================
 
 
@@ -1622,7 +1598,43 @@ def view_xml_s2221(id):
     except Exception as e:
         flash(f'Erro ao gerar XML: {str(e)}', 'danger')
         return redirect(url_for('list_s2221'))
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
+def gerar_xml_s2221(evento, empresa, funcionario, ambiente='2'):
+    """Gera XML do evento S-2221 (exame toxicológico)"""
+    ns = 'http://www.esocial.gov.br/schema/evt/exmTox/v02_02_00'
+    ET.register_namespace('', ns)
+
+    root = ET.Element('eSocial', xmlns=ns)
+    evento_elem = ET.SubElement(root, 'evtExmTox')
+    ET.SubElement(evento_elem, 'Id').text = f"ID{evento.id:08d}"
+
+    ide_evento = ET.SubElement(evento_elem, 'ideEvento')
+    ET.SubElement(ide_evento, 'indRetif').text = '1'
+    ET.SubElement(ide_evento, 'nrRecibo').text = ''
+    ET.SubElement(ide_evento, 'tpAmb').text = ambiente
+    ET.SubElement(ide_evento, 'procEmi').text = '1'
+    ET.SubElement(ide_evento, 'verProc').text = '1.0.0'
+
+    ide_empregador = ET.SubElement(evento_elem, 'ideEmpregador')
+    ET.SubElement(ide_empregador, 'tpInsc').text = '1'
+    ET.SubElement(ide_empregador, 'nrInsc').text = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
+
+    ide_trab = ET.SubElement(evento_elem, 'ideTrabalhador')
+    ET.SubElement(ide_trab, 'cpfTrab').text = funcionario.cpf.replace('.', '').replace('-', '')
+    ET.SubElement(ide_trab, 'matricula').text = funcionario.matricula_esocial or ''
+
+    info_exm_tox = ET.SubElement(evento_elem, 'infoExmTox')
+    ET.SubElement(info_exm_tox, 'dtExm').text = evento.data_exame.strftime('%Y-%m-%d')
+    ET.SubElement(info_exm_tox, 'tpExmTox').text = evento.tipo_exame
+    ET.SubElement(info_exm_tox, 'resExmTox').text = evento.resultado
+    ET.SubElement(info_exm_tox, 'laboratorio').text = evento.laboratorio or ''
+    ET.SubElement(info_exm_tox, 'cpfResp').text = evento.cpf_responsavel.replace('.', '').replace('-', '')
+
+    xml_str = ET.tostring(root, encoding='unicode')
+    dom = minidom.parseString(xml_str)
+    return dom.toprettyxml(indent="  ")
 ########################################################### EVENTO S 2220 #############################
 def gerar_xml_s2220(evento, empresa, funcionario, ambiente='2'):
     """
@@ -1708,132 +1720,6 @@ def gerar_xml_s2220(evento, empresa, funcionario, ambiente='2'):
 
     return xml
 
-@app.route('/processar_s2220', methods=['POST'])
-@login_required
-def processar_s2220():
-    try:
-        funcionario_id = request.form.get('funcionario_id')
-        data_aso = request.form.get('data_aso')
-        crm_medico = request.form.get('crm_medico')
-        uf_crm = request.form.get('uf_crm')
-        cpf_medico = request.form.get('cpf_medico')  # Agora é opcional
-        apenas_xml = request.form.get('apenas_xml') == 'true'
-
-        # ================= VALIDAÇÕES =================
-
-        # Validar campos obrigatórios
-        if not funcionario_id:
-            return "Campo 'funcionário' é obrigatório", 400
-        if not data_aso:
-            return "Campo 'data do ASO' é obrigatório", 400
-        if not crm_medico:
-            return "Campo 'CRM do médico' é obrigatório", 400
-        if not uf_crm:
-            return "Campo 'UF do CRM' é obrigatório", 400
-
-        # Validar CPF do médico apenas se foi preenchido
-        if cpf_medico and not validar_cpf(cpf_medico):
-            return f"CPF do médico inválido: {cpf_medico}", 400
-
-        # Validar se funcionário existe
-        funcionario = db.session.get(Funcionario, int(funcionario_id))
-        if not funcionario:
-            return f"Funcionário ID {funcionario_id} não encontrado", 404
-
-        # Validar se funcionário tem matrícula e CBO
-        if not funcionario.matricula_esocial or not funcionario.cbo:
-            return "Funcionário sem matrícula eSocial ou CBO cadastrado", 400
-
-        # Capturar exames
-        datas_exame = request.form.getlist('data_exame[]')
-        tipos_exame = request.form.getlist('tipo_exame[]')
-        resultados = request.form.getlist('resultado[]')
-
-        exames = []
-        for i in range(len(datas_exame)):
-            if datas_exame[i] and tipos_exame[i] and resultados[i]:
-                exames.append({
-                    'data_exame': datetime.strptime(datas_exame[i], '%Y-%m-%d').date(),
-                    'tipo_exame': tipos_exame[i],
-                    'resultado': resultados[i]
-                })
-
-        # ================= PROCESSAMENTO =================
-
-        # Se for apenas gerar XML (não salvar no banco)
-        if apenas_xml:
-            try:
-                # Criar evento temporário
-                evento_temp = EventoS2220(
-                    funcionario_id=funcionario.id,
-                    data_aso=datetime.strptime(data_aso, '%Y-%m-%d').date(),
-                    crm_medico=crm_medico,
-                    uf_crm=uf_crm,
-                    cpf_medico=cpf_medico if cpf_medico else ''  # Se vazio, salva como string vazia
-                )
-
-                # Adicionar exames temporários
-                for ex in exames:
-                    exame_temp = S2220Exame(
-                        data_exame=ex['data_exame'],
-                        tipo_exame=ex['tipo_exame'],
-                        resultado=ex['resultado']
-                    )
-                    evento_temp.exames.append(exame_temp)
-
-                # Gerar XML
-                xml_gerado = gerar_xml_s2220(evento_temp, funcionario.empresa, funcionario, '2')
-                buffer = BytesIO(xml_gerado.encode('utf-8'))
-
-                return send_file(
-                    buffer,
-                    as_attachment=True,
-                    download_name=f'S2220_{funcionario.nome.replace(" ", "_")}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xml',
-                    mimetype='application/xml'
-                )
-            except Exception as e:
-                print(f"Erro ao gerar XML: {str(e)}")
-                return f"Erro ao gerar XML: {str(e)}", 500
-
-        # ================= SALVAR NO BANCO DE DADOS =================
-
-        try:
-            # Criar evento
-            evento = EventoS2220(
-                funcionario_id=funcionario.id,
-                data_aso=datetime.strptime(data_aso, '%Y-%m-%d').date(),
-                crm_medico=crm_medico,
-                uf_crm=uf_crm,
-                cpf_medico=cpf_medico if cpf_medico else ''  # Se vazio, salva como string vazia
-            )
-            db.session.add(evento)
-            db.session.flush()  # Para obter o ID do evento
-
-            # Adicionar exames
-            for ex in exames:
-                exame_obj = S2220Exame(
-                    evento_id=evento.id,
-                    data_exame=ex['data_exame'],
-                    tipo_exame=ex['tipo_exame'],
-                    resultado=ex['resultado']
-                )
-                db.session.add(exame_obj)
-
-            db.session.commit()
-
-            flash('Evento S-2220 criado com sucesso!', 'success')
-            return redirect(url_for('list_s2220'))
-
-        except Exception as e:
-            db.session.rollback()
-            print(f"Erro ao salvar no banco: {str(e)}")
-            return f"Erro ao salvar evento: {str(e)}", 500
-
-    except Exception as e:
-        print(f"Erro inesperado: {str(e)}")
-        return f"Erro interno do servidor: {str(e)}", 500
-
-
 
 
 
@@ -1857,7 +1743,44 @@ def view_pdf_s2220(id):
 
 
 ######################################################## ================= ROTAS S-2210 =================
+def gerar_xml_s2210(evento, empresa, funcionario, ambiente='2'):
+    import xml.etree.ElementTree as ET
+    from xml.dom import minidom
+    ns = 'http://www.esocial.gov.br/schema/evt/cat/v02_02_00'
+    ET.register_namespace('', ns)
+    root = ET.Element('eSocial', xmlns=ns)
+    evt = ET.SubElement(root, 'evtCAT')
+    ET.SubElement(evt, 'Id').text = f"ID{evento.id:08d}"
 
+    ideEvento = ET.SubElement(evt, 'ideEvento')
+    ET.SubElement(ideEvento, 'indRetif').text = '1'
+    ET.SubElement(ideEvento, 'nrRecibo').text = ''
+    ET.SubElement(ideEvento, 'tpAmb').text = ambiente
+    ET.SubElement(ideEvento, 'procEmi').text = '1'
+    ET.SubElement(ideEvento, 'verProc').text = '1.0.0'
+
+    ideEmpregador = ET.SubElement(evt, 'ideEmpregador')
+    ET.SubElement(ideEmpregador, 'tpInsc').text = '1'
+    nr_insc = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
+    ET.SubElement(ideEmpregador, 'nrInsc').text = nr_insc
+
+    ideTrab = ET.SubElement(evt, 'ideTrabalhador')
+    ET.SubElement(ideTrab, 'cpfTrab').text = funcionario.cpf.replace('.', '').replace('-', '')
+    ET.SubElement(ideTrab, 'matricula').text = funcionario.matricula_esocial or ''
+
+    infoCAT = ET.SubElement(evt, 'infoCAT')
+    ET.SubElement(infoCAT, 'dtAcid').text = evento.data_acidente.strftime('%Y-%m-%d')
+    ET.SubElement(infoCAT, 'tpAcid').text = evento.tipo_acidente
+    # Hora é opcional, mas se tiver campo 'hora_acidente', adicione
+    if hasattr(evento, 'hora_acidente') and evento.hora_acidente:
+        ET.SubElement(infoCAT, 'hrAcid').text = evento.hora_acidente
+    ET.SubElement(infoCAT, 'local').text = evento.local or ''
+    ET.SubElement(infoCAT, 'parteAtingida').text = evento.parte_atingida or ''
+    ET.SubElement(infoCAT, 'descricao').text = evento.descricao or ''
+
+    xml_str = ET.tostring(root, encoding='unicode')
+    dom = minidom.parseString(xml_str)
+    return dom.toprettyxml(indent="  ")
 @app.route('/s2210/create', methods=['GET'])
 @login_required  # ← Adicione este decorator também
 def create_s2210():
@@ -1866,25 +1789,21 @@ def create_s2210():
 
 
 @app.route('/s2210/edit/<int:id>', methods=['GET', 'POST'])
-@login_required
 def edit_s2210(id):
     evento = EventoS2210.query.get_or_404(id)
-    funcionarios = Funcionario.query.all()
     if request.method == 'POST':
+        # atualiza campos
         evento.funcionario_id = request.form['funcionario_id']
-        evento.data_acidente = datetime.strptime(request.form['data_acidente'], '%Y-%m-%d').date()
-        evento.hora_acidente = datetime.strptime(request.form['hora_acidente'], '%H:%M').time()
-        evento.tipo_cat = request.form['tipo_cat']
+        evento.data_acidente = datetime.strptime(request.form['data_acidente'], '%Y-%m-%d')
         evento.tipo_acidente = request.form['tipo_acidente']
         evento.local = request.form['local']
         evento.parte_atingida = request.form['parte_atingida']
         evento.descricao = request.form['descricao']
-        evento.cpf_responsavel = request.form['cpf_responsavel']
+        # Se houver campo hora_acidente, capture-o
         db.session.commit()
-        flash('Evento S-2210 atualizado!', 'success')  # ← Adicione 'success'
+        flash('Atualizado!')
         return redirect(url_for('list_s2210'))
-    return render_template('eventos/s2210_edit.html', evento=evento, funcionarios=funcionarios)
-
+    return render_template('eventos/s2210_edit.html', evento=evento, funcionarios=Funcionario.query.all())
 @app.route('/s2210/delete/<int:id>')
 @login_required
 def delete_s2210(id):
@@ -2343,7 +2262,44 @@ def validar_cpf(cpf: str) -> bool:
         resto = 0
 
     return resto == int(cpf[10])
+def gerar_xml_s2240(evento, empresa, funcionario, ambiente='2'):
+    import xml.etree.ElementTree as ET
+    from xml.dom import minidom
+    ns = 'http://www.esocial.gov.br/schema/evt/expRisco/v02_02_00'
+    ET.register_namespace('', ns)
+    root = ET.Element('eSocial', xmlns=ns)
+    evt = ET.SubElement(root, 'evtExpRisco')
+    ET.SubElement(evt, 'Id').text = f"ID{evento.id:08d}"
 
+    ideEvento = ET.SubElement(evt, 'ideEvento')
+    ET.SubElement(ideEvento, 'indRetif').text = '1'
+    ET.SubElement(ideEvento, 'nrRecibo').text = ''
+    ET.SubElement(ideEvento, 'tpAmb').text = ambiente
+    ET.SubElement(ideEvento, 'procEmi').text = '1'
+    ET.SubElement(ideEvento, 'verProc').text = '1.0.0'
+
+    ideEmpregador = ET.SubElement(evt, 'ideEmpregador')
+    ET.SubElement(ideEmpregador, 'tpInsc').text = '1'
+    ET.SubElement(ideEmpregador, 'nrInsc').text = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
+
+    ideTrab = ET.SubElement(evt, 'ideTrabalhador')
+    ET.SubElement(ideTrab, 'cpfTrab').text = funcionario.cpf.replace('.', '').replace('-', '')
+    ET.SubElement(ideTrab, 'matricula').text = funcionario.matricula_esocial or ''
+
+    infoExpRisco = ET.SubElement(evt, 'infoExpRisco')
+    ET.SubElement(infoExpRisco, 'dtAvaliacao').text = evento.data_avaliacao.strftime('%Y-%m-%d')
+    ET.SubElement(infoExpRisco, 'cpfAval').text = evento.cpf_avaliador.replace('.', '').replace('-', '')
+
+    # Riscos associados (se houver)
+    for risco in evento.riscos:  # ajuste conforme seu relacionamento
+        risco_elem = ET.SubElement(infoExpRisco, 'risco')
+        ET.SubElement(risco_elem, 'codAgNoc').text = risco.codigo_agente
+        ET.SubElement(risco_elem, 'intensid').text = risco.intensidade
+        ET.SubElement(risco_elem, 'epiEficaz').text = risco.epi_utilizado or ''
+
+    xml_str = ET.tostring(root, encoding='unicode')
+    dom = minidom.parseString(xml_str)
+    return dom.toprettyxml(indent="  ")
 ################################################################# certificado #############################
 def carregar_certificado(pfx_path, senha):
     """Carrega certificado A1 no formato .pfx com melhor tratamento de erro"""
@@ -2760,8 +2716,148 @@ def enviar_s2240(id):
         flash(f'Erro ao enviar: {str(e)}', 'danger')
 
     return redirect(url_for('list_s2240'))
+##################################################   DEV DE S2221 2210 E2240 #################
+# ================= S-2210 (CAT) =================
+def gerar_xml_s2210(evento, empresa, funcionario, ambiente='2'):
+    import xml.etree.ElementTree as ET
+    from xml.dom import minidom
+    from datetime import time as datetime_time  # para type checking
 
+    ns = 'http://www.esocial.gov.br/schema/evt/cat/v02_02_00'
+    ET.register_namespace('', ns)
+    root = ET.Element('eSocial', xmlns=ns)
+    evt = ET.SubElement(root, 'evtCAT')
+    ET.SubElement(evt, 'Id').text = f"ID{evento.id:08d}"
 
+    ideEvento = ET.SubElement(evt, 'ideEvento')
+    ET.SubElement(ideEvento, 'indRetif').text = '1'
+    ET.SubElement(ideEvento, 'nrRecibo').text = ''
+    ET.SubElement(ideEvento, 'tpAmb').text = ambiente
+    ET.SubElement(ideEvento, 'procEmi').text = '1'
+    ET.SubElement(ideEvento, 'verProc').text = '1.0.0'
+
+    ideEmpregador = ET.SubElement(evt, 'ideEmpregador')
+    ET.SubElement(ideEmpregador, 'tpInsc').text = '1'
+    nr_insc = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
+    ET.SubElement(ideEmpregador, 'nrInsc').text = nr_insc
+
+    ideTrab = ET.SubElement(evt, 'ideTrabalhador')
+    ET.SubElement(ideTrab, 'cpfTrab').text = funcionario.cpf.replace('.', '').replace('-', '')
+    ET.SubElement(ideTrab, 'matricula').text = funcionario.matricula_esocial or ''
+
+    infoCAT = ET.SubElement(evt, 'infoCAT')
+    ET.SubElement(infoCAT, 'dtAcid').text = evento.data_acidente.strftime('%Y-%m-%d')
+    ET.SubElement(infoCAT, 'tpAcid').text = evento.tipo_acidente
+    # Hora: converte se for datetime.time
+    if hasattr(evento, 'hora_acidente') and evento.hora_acidente:
+        if isinstance(evento.hora_acidente, datetime_time):
+            hora_str = evento.hora_acidente.strftime('%H:%M')
+        else:
+            hora_str = str(evento.hora_acidente)
+        ET.SubElement(infoCAT, 'hrAcid').text = hora_str
+    if evento.local:
+        ET.SubElement(infoCAT, 'local').text = evento.local
+    if evento.parte_atingida:
+        ET.SubElement(infoCAT, 'parteAtingida').text = evento.parte_atingida
+    ET.SubElement(infoCAT, 'descricao').text = evento.descricao or ''
+
+    xml_str = ET.tostring(root, encoding='unicode')
+    dom = minidom.parseString(xml_str)
+    return dom.toprettyxml(indent="  ")
+
+# ================= S-2240 (Riscos) =================
+def gerar_xml_s2240(evento, empresa, funcionario, ambiente='2'):
+    import xml.etree.ElementTree as ET
+    from xml.dom import minidom
+    ns = 'http://www.esocial.gov.br/schema/evt/expRisco/v02_02_00'
+    ET.register_namespace('', ns)
+    root = ET.Element('eSocial', xmlns=ns)
+    evt = ET.SubElement(root, 'evtExpRisco')
+    ET.SubElement(evt, 'Id').text = f"ID{evento.id:08d}"
+
+    ideEvento = ET.SubElement(evt, 'ideEvento')
+    ET.SubElement(ideEvento, 'indRetif').text = '1'
+    ET.SubElement(ideEvento, 'nrRecibo').text = ''
+    ET.SubElement(ideEvento, 'tpAmb').text = ambiente
+    ET.SubElement(ideEvento, 'procEmi').text = '1'
+    ET.SubElement(ideEvento, 'verProc').text = '1.0.0'
+
+    ideEmpregador = ET.SubElement(evt, 'ideEmpregador')
+    ET.SubElement(ideEmpregador, 'tpInsc').text = '1'
+    nr_insc = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
+    ET.SubElement(ideEmpregador, 'nrInsc').text = nr_insc
+
+    ideTrab = ET.SubElement(evt, 'ideTrabalhador')
+    ET.SubElement(ideTrab, 'cpfTrab').text = funcionario.cpf.replace('.', '').replace('-', '')
+    ET.SubElement(ideTrab, 'matricula').text = funcionario.matricula_esocial or ''
+
+    infoExpRisco = ET.SubElement(evt, 'infoExpRisco')
+    ET.SubElement(infoExpRisco, 'dtAvaliacao').text = evento.data_avaliacao.strftime('%Y-%m-%d')
+    ET.SubElement(infoExpRisco, 'cpfAval').text = evento.cpf_avaliador.replace('.', '').replace('-', '')
+
+    # Se houver riscos associados (ajuste conforme seu modelo)
+    if hasattr(evento, 'riscos') and evento.riscos:
+        for risco in evento.riscos:
+            risco_elem = ET.SubElement(infoExpRisco, 'risco')
+            ET.SubElement(risco_elem, 'codAgNoc').text = risco.codigo_agente
+            ET.SubElement(risco_elem, 'intensid').text = risco.intensidade
+            if risco.epi_utilizado:
+                ET.SubElement(risco_elem, 'epiEficaz').text = risco.epi_utilizado
+
+    xml_str = ET.tostring(root, encoding='unicode')
+    dom = minidom.parseString(xml_str)
+    return dom.toprettyxml(indent="  ")
+
+# ================= S-2221 (Exame Toxicológico) =================
+def gerar_xml_s2221(evento, empresa, funcionario, ambiente='2'):
+    import xml.etree.ElementTree as ET
+    from xml.dom import minidom
+    ns = 'http://www.esocial.gov.br/schema/evt/exmTox/v02_02_00'
+    ET.register_namespace('', ns)
+    root = ET.Element('eSocial', xmlns=ns)
+    evt = ET.SubElement(root, 'evtExmTox')
+    ET.SubElement(evt, 'Id').text = f"ID{evento.id:08d}"
+
+    ideEvento = ET.SubElement(evt, 'ideEvento')
+    ET.SubElement(ideEvento, 'indRetif').text = '1'
+    ET.SubElement(ideEvento, 'nrRecibo').text = ''
+    ET.SubElement(ideEvento, 'tpAmb').text = ambiente
+    ET.SubElement(ideEvento, 'procEmi').text = '1'
+    ET.SubElement(ideEvento, 'verProc').text = '1.0.0'
+
+    ideEmpregador = ET.SubElement(evt, 'ideEmpregador')
+    ET.SubElement(ideEmpregador, 'tpInsc').text = '1'
+    nr_insc = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
+    ET.SubElement(ideEmpregador, 'nrInsc').text = nr_insc
+
+    ideTrab = ET.SubElement(evt, 'ideTrabalhador')
+    ET.SubElement(ideTrab, 'cpfTrab').text = funcionario.cpf.replace('.', '').replace('-', '')
+    ET.SubElement(ideTrab, 'matricula').text = funcionario.matricula_esocial or ''
+
+    infoExmTox = ET.SubElement(evt, 'infoExmTox')
+    ET.SubElement(infoExmTox, 'dtExm').text = evento.data_exame.strftime('%Y-%m-%d')
+    ET.SubElement(infoExmTox, 'tpExmTox').text = evento.tipo_exame
+    ET.SubElement(infoExmTox, 'resExmTox').text = evento.resultado
+    if evento.laboratorio:
+        ET.SubElement(infoExmTox, 'laboratorio').text = evento.laboratorio
+    ET.SubElement(infoExmTox, 'cpfResp').text = evento.cpf_responsavel.replace('.', '').replace('-', '')
+
+    xml_str = ET.tostring(root, encoding='unicode')
+    dom = minidom.parseString(xml_str)
+    return dom.toprettyxml(indent="  ")
+
+@app.route('/s2210/view_xml/<int:id>')
+@login_required
+def view_xml_s2210(id):
+    evento = EventoS2210.query.get_or_404(id)
+    if not evento.data_acidente:
+        flash('Evento sem data de acidente, não é possível gerar XML', 'error')
+        return redirect(url_for('list_s2210'))
+    funcionario = evento.funcionario
+    empresa = funcionario.empresa
+    xml_str = gerar_xml_s2210(evento, empresa, funcionario, '2')
+    return Response(xml_str, mimetype='application/xml')
+##################################################### RECIBOS #################################
 @app.route('/recibos')
 @login_required
 def listar_recibos():

@@ -35,11 +35,14 @@
                             {% else %}
                                 <span class="badge bg-warning">Pendente</span>
                             {% endif %}
-                         </td>
+                        </td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
                                 <a href="{{ url_for('edit_s2240', id=evento.id) }}" class="btn btn-warning">✏️ Editar</a>
                                 <a href="{{ url_for('delete_s2240', id=evento.id) }}" class="btn btn-danger" onclick="return confirm('Confirmar exclusão?')">🗑️ Excluir</a>
+
+                                <!-- Botão para visualizar XML -->
+                                <a href="{{ url_for('view_xml_s2240', id=evento.id) }}" class="btn btn-info" target="_blank">📄 XML</a>
 
                                 {% if evento.status != 'enviado' %}
                                 <a href="{{ url_for('enviar_s2240', id=evento.id) }}" class="btn btn-success"
@@ -54,8 +57,8 @@
                                 </button>
                                 {% endif %}
                             </div>
-                         </td>
-                     </tr>
+                        </td>
+                    </tr>
                     {% else %}
                     <tr>
                         <td colspan="6" class="text-center">Nenhuma avaliação cadastrada.</td>

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if evento %}Editar Evento S-2220{% else %}Novo Evento S-2220{% endif %}</h2>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+            {{ form.data_avaliacao.label(class="form-label") }}
+            {{ form.data_avaliacao(class="form-control", type="date") }}
+            {% for error in form.data_avaliacao.errors %}
+                <div class="text-danger">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.cpf_avaliador.label(class="form-label") }}
+            {{ form.cpf_avaliador(class="form-control") }}
+            {% for error in form.cpf_avaliador.errors %}
+                <div class="text-danger">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3 form-check">
+            {{ form.nenhum_risco(class="form-check-input") }}
+            {{ form.nenhum_risco.label(class="form-check-label") }}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Salvar</button>
+        <a href="{{ url_for('list_s2220') }}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

@@ -31,6 +31,12 @@
         .copy-btn:hover {
             background-color: #f0f0f0;
         }
+        .assinatura-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 10px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -180,25 +186,26 @@
 
         {% block content %}{% endblock %}
 
-        <!-- ========= NOVO: CARD PIX PARA CLIENTE (VISÍVEL NA ÁREA DE CONTEÚDO) ========= -->
+        <!-- ========= CARD PIX: APENAS ASSINATURA MENSAL R$ 29,99 ========= -->
         <div class="pix-card mt-4 mb-4">
             <div class="row align-items-center">
                 <div class="col-md-2 text-center">
-                    <i class="bi bi-qr-code" style="font-size: 48px;"></i>
+                    <i class="bi bi-calendar-check" style="font-size: 48px;"></i>
                 </div>
-                <div class="col-md-6">
-                    <h5><i class="bi bi-currency-dollar"></i> Contribuição voluntária</h5>
-                    <p class="mb-1">Ajude a manter o sistema! Sua doação é muito importante.</p>
-                    <p><strong>Valor sugerido:</strong> R$ 50,00</p>
+                <div class="col-md-5">
+                    <h5><i class="bi bi-clock-history"></i> Plano de Assinatura Mensal</h5>
+                    <p class="mb-1">Acesso contínuo ao sistema, suporte prioritário e novas funcionalidades.</p>
+                    <p class="mb-0"><strong class="fs-4">R$ 29,99 / mês</strong></p>
+                    <small>PIX recorrente disponível em bancos compatíveis.</small>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-5">
                     <div class="input-group">
                         <input type="text" id="pixKey" class="form-control pix-key" value="sstergonomia2@gmail.com" readonly>
                         <button class="btn btn-light copy-btn" onclick="copyPix()">
                             <i class="bi bi-copy"></i> Copiar chave
                         </button>
                     </div>
-                    <small class="text-light">Chave PIX (e-mail)</small>
+                    <small class="text-light">Chave PIX (e-mail) – Copie e configure a recorrência mensal no seu banco</small>
                 </div>
             </div>
         </div>
@@ -213,7 +220,7 @@
         {% endif %}
     </div>
 
-    <!-- Modal Tira Dúvidas (já existente, mas melhoramos a seção PIX) -->
+    <!-- Modal Tira Dúvidas com valor mensal R$ 29,99 -->
     <div class="modal fade" id="modalDuvidas" tabindex="-1" aria-labelledby="modalDuvidasLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -234,12 +241,14 @@
                             <p><strong>💬 WhatsApp:</strong> (73) 99977-3814</p>
                         </div>
 
-                        <!-- Seção PIX destacada no modal -->
+                        <!-- Seção PIX com assinatura mensal R$ 29,99 -->
                         <div class="pix-card mt-3 mb-3" style="background: #28a745;">
-                            <h5><i class="bi bi-cash-stack"></i> Apoie o projeto</h5>
-                            <p><strong>PIX (Chave aleatória ou e-mail):</strong> <span id="pixModalKey" class="fw-bold">sstergonomia2@gmail.com</span></p>
+                            <h5><i class="bi bi-cash-stack"></i> Apoie com assinatura mensal</h5>
+                            <p><strong>PIX (Chave e-mail):</strong> <span id="pixModalKey" class="fw-bold">sstergonomia2@gmail.com</span></p>
                             <button class="btn btn-sm btn-light" onclick="copyModalPix()">Copiar chave PIX</button>
-                            <p class="mt-2 mb-0">Contribuição sugerida: <strong>R$ 50,00</strong> - Qualquer valor ajuda!</p>
+                            <p class="mt-2 mb-0">
+                                <strong>Assinatura mensal: R$ 29,99</strong> – Configure o PIX recorrente no seu aplicativo bancário.
+                            </p>
                         </div>
 
                         <hr>
@@ -249,6 +258,7 @@
                             <p><strong>• Como enviar eventos?</strong><br>Cadastre empresa e funcionários, depois acesse o evento desejado.</p>
                             <p><strong>• Como configurar certificado?</strong><br>Acesse "Meu Certificado Digital" no menu e faça o upload.</p>
                             <p><strong>• Diferença entre TESTE e PRODUÇÃO?</strong><br>Modo TESTE não envia para o eSocial real. PRODUÇÃO envia com certificado.</p>
+                            <p><strong>• Como fazer a assinatura mensal?</strong><br>Copie a chave PIX, acesse o app do seu banco e agende um PIX recorrente mensal de R$ 29,99.</p>
                         </div>
                     </div>
                 </div>

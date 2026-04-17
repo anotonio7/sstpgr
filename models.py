@@ -105,8 +105,7 @@ class S2220Exame(db.Model):
     data_exame = db.Column(db.Date, nullable=False)
     tipo_exame = db.Column(db.String(50), nullable=False)
     resultado = db.Column(db.Text, nullable=False)
-
-
+    descricao_atividade = db.Column(db.Text, nullable=True)   # ← nova linha
 
 # ================= EVENTO S-2221 (EXAME TOXICOLÓGICO) =================
 class EventoS2221(db.Model):
@@ -255,3 +254,4 @@ class EPIEntrega(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     funcionario = db.relationship('Funcionario', backref='epi_entregas')
+

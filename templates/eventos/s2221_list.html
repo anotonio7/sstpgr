@@ -19,6 +19,7 @@
                         <th>Data do Exame</th>
                         <th>Tipo de Exame</th>
                         <th>Resultado</th>
+                        <th>Status</th>   <!-- NOVA COLUNA -->
                         <th>Ações</th>
                     </tr>
                 </thead>
@@ -27,32 +28,38 @@
                     <tr>
                         <td>{{ evento.id }}</td>
                         <td>{{ evento.funcionario.nome if evento.funcionario else 'N/A' }}</td>
-
-                        <!-- CORREÇÃO: Verificar se o campo existe antes de usar -->
                         {% if evento.data_exame %}
                             <td>{{ evento.data_exame.strftime('%d/%m/%Y') }}</td>
                         {% else %}
                             <td class="text-muted">Não informada</td>
                         {% endif %}
-                        <!-- FIM DA CORREÇÃO -->
-
                         <td>{{ evento.tipo_exame if evento.tipo_exame else 'N/A' }}</td>
                         <td>{{ evento.resultado if evento.resultado else 'Pendente' }}</td>
-
+                        <td>
+                            {% if evento.status == 'enviado' %}
+                                <span class="badge bg-success">Enviado</span>
+                            {% else %}
+                                <span class="badge bg-warning">Pendente</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
-                                <a href="{{ url_for('view_xml_s2221', id=evento.id) }}" class="btn btn-info" target="_blank">XML</a>
-                                <a href="{{ url_for('edit_s2221', id=evento.id) }}" class="btn btn-warning">Editar</a>
-                                <a href="{{ url_for('delete_s2221', id=evento.id) }}" class="btn btn-danger" onclick="return confirm('Confirmar exclusão?')">Excluir</a>
+                                <!-- Botão XML -->
+                                <a href="{{ url_for('view_xml_s2221', id=evento.id) }}" class="btn btn-info" target="_blank">📄 XML</a>
+                                <a href="{{ url_for('edit_s2221', id=evento.id) }}" class="btn btn-warning">✏️ Editar</a>
+                                <a href="{{ url_for('delete_s2221', id=evento.id) }}" class="btn btn-danger" onclick="return confirm('Confirmar exclusão?')">🗑️ Excluir</a>
                                 {% if evento.status != 'enviado' %}
-                                <a href="{{ url_for('enviar_s2221', id=evento.id) }}" class="btn btn-success" onclick="return confirm('Enviar este evento para o eSocial?')">Enviar</a>
+                                <a href="{{ url_for('enviar_s2221', id=evento.id) }}" class="btn btn-success" onclick="return confirm('Enviar este evento para o eSocial?')">📤 Enviar</a>
+                                {% endif %}
+                                {% if evento.recibo %}
+                                <button class="btn btn-secondary" onclick="alert('Recibo: {{ evento.recibo }}')">📋 Recibo</button>
                                 {% endif %}
                             </div>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="text-center">Nenhum exame toxicológico cadastrado.</td>
+                        <td colspan="7" class="text-center">Nenhum exame toxicológico cadastrado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
